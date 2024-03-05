@@ -8,6 +8,7 @@ from calibrate import Calibrator
 from dart_track import dart_track
 from CTkMessagebox import CTkMessagebox
 from multiprocessing import Process
+import serial.tools.list_ports
 from PIL import Image, ImageTk
 import customtkinter as ctk
 from mocap_stream import *
@@ -15,7 +16,6 @@ import vec_math2 as vm2
 import tkinter as tk
 import numpy as np
 import cProfile
-import pickle
 import time
 import cv2
 import os
@@ -48,23 +48,18 @@ class DART:
 
         # Create an instance of Calibrator
         self.calibrator = Calibrator()
-        
-        # try:
-        #     self.target = MoCap(stream_type='3d')
-        #     self.target.calibration_target = True
-        # except Exception as e:
-        #     logging.error(f"Error connecting to QTM: {e}")
-        #     self.target = None
 
+        self.selected_com_port = ctk.StringVar(value="")
+        
         try:
-            self.dyna = DynaController(com_port='COM5')
-            self.dyna.open_port()
-            self.dyna.set_op_mode(1, 3)  # Pan to position control
-            self.dyna.set_op_mode(2, 3)  # Tilt to position control
-            self.dyna.set_sync_pos(225, 315)
-        except:
-            logging.error("Error connecting to Dynamixel controller.")
-            self.dyna = None
+            self.target = MoCap(stream_type='3d')
+            self.target.calibration_target = True
+        except Exception as e:
+            logging.error(f"Error connecting to QTM: {e}")
+            self.target = None
+
+        self.dyna = None
+
 
     def init_gui_flags(self):
         # Camera/image functionality
@@ -88,6 +83,18 @@ class DART:
         ################## Frame for motor controls ##################
         dyn_control_frame = ctk.CTkFrame(self.window)
         dyn_control_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)  # Increase vertical padding
+
+        serial_ports = get_serial_ports()
+
+        # Assuming `dyn_control_frame` is the frame you want to add the combobox to
+        self.com_port_combobox = ctk.CTkComboBox(dyn_control_frame, values=serial_ports,
+                                                variable=self.selected_com_port,
+                                                command=lambda choice: self.connect_dyna_controller())
+        self.com_port_combobox.pack(side="top", padx=10, pady=10)
+
+        # Update the combobox with available ports each time the window is shown or refreshed
+        self.update_serial_ports_dropdown()
+
 
         # Frame for pan slider and label
         pan_frame = ctk.CTkFrame(dyn_control_frame)
@@ -130,11 +137,20 @@ class DART:
         # Frame for exposure slider and label
         exposure_frame = ctk.CTkFrame(camera_control_frame)
         exposure_frame.pack(side="left", padx=10, pady = 10)
-        self.exposure_slider = ctk.CTkSlider(exposure_frame, from_=1, to=100000, command=self.adjust_exposure)
+        self.exposure_slider = ctk.CTkSlider(exposure_frame, from_=4, to=10000, command=self.adjust_exposure)
         self.exposure_slider.set(50)
         self.exposure_slider.pack(padx =5, pady=5)
         self.exposure_label = ctk.CTkLabel(exposure_frame, text="Exposure (us): 57500")
         self.exposure_label.pack()
+ 
+        # Frame for gain slider and label
+        gain_frame = ctk.CTkFrame(camera_control_frame)
+        gain_frame.pack(side="left", padx=10, pady=10)
+        self.gain_slider = ctk.CTkSlider(gain_frame, from_=0, to=50, command=self.adjust_gain)
+        self.gain_slider.set(25) 
+        self.gain_slider.pack(padx=5, pady=5)
+        self.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 25")
+        self.gain_label.pack()
 
         ################## Frame for image processing detect ##################
         img_processing_frame = ctk.CTkFrame(self.window)
@@ -212,6 +228,14 @@ class DART:
         self.is_saving_images = not self.is_saving_images
         self.record_button.configure(text="Stop Saving Images" if self.is_saving_images else "Start Saving Images")
 
+    def adjust_gain(self, gain_value: float):
+        if self.camera_manager.cap:
+            try:
+                self.camera_manager.cap.set(cv2.CAP_PROP_GAIN, float(gain_value)) # dB
+                self.gain_label.configure(text=f"Gain (dB): {gain_value}")
+            except AttributeError:
+                logging.error("Gain not set.")
+
     def adjust_exposure(self, exposure_value: float):
         if self.camera_manager.cap:
             try:
@@ -257,17 +281,49 @@ class DART:
         self.image_pro.strength_value = int(value)
         self.strength_label.configure(text=f"Strength: {int(value)}")
 
+    def update_serial_ports_dropdown(self):
+        """Updates the list of serial ports in the dropdown."""
+        serial_ports = get_serial_ports()
+        self.com_port_combobox.configure(values=serial_ports)
+        if serial_ports:
+            self.com_port_combobox.set(serial_ports[0])
+        else:
+            self.com_port_combobox.set("")
+
+    def connect_dyna_controller(self):
+        """Initializes or reconnects the DynaController with the selected COM port."""
+        try:
+            selected_port = self.selected_com_port.get()  # Ensure this matches how you obtain the selected COM port value
+            if selected_port:
+                self.dyna = DynaController(com_port=selected_port)
+                self.dyna.open_port()
+                self.dyna.set_op_mode(1, 3)  # Pan to position control
+                self.dyna.set_op_mode(2, 3)  # Tilt to position control
+                self.dyna.set_sync_pos(225, 315)
+                logging.info(f"Connected to Dynamixel controller on {selected_port}.")
+            else:
+                logging.error("No COM port selected.")
+        except Exception as e:
+            logging.error(f"Error connecting to Dynamixel controller: {e}")
+            self.dyna = None
+
     def set_pan(self, value: float):
-        self.pan_value = int(value)
-        self.pan_label.configure(text=f"Pan angle: {int(value)}")
-        angle = vm2.num_to_range(self.pan_value, -45, 45, 202.5, 247.5)
-        self.dyna.set_pos(1, angle)
+        if self.dyna is not None:
+            self.pan_value = int(value)
+            self.pan_label.configure(text=f"Pan angle: {int(value)}")
+            angle = vm2.num_to_range(self.pan_value, -45, 45, 202.5, 247.5)
+            self.dyna.set_pos(1, angle)
+        else:
+            logging.error("Dynamixel controller not connected.")
 
     def set_tilt(self, value: float):
-        self.tilt_value = int(value)
-        self.tilt_label.configure(text=f"Tilt angle: {int(value)}")
-        angle = vm2.num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
-        self.dyna.set_pos(2, angle)
+        if self.dyna is not None:
+            self.tilt_value = int(value)
+            self.tilt_label.configure(text=f"Tilt angle: {int(value)}")
+            angle = vm2.num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
+            self.dyna.set_pos(2, angle)
+        else:
+            logging.error("Dynamixel controller not connected.")
 
     def on_closing(self):
         try:
@@ -301,6 +357,14 @@ class DART:
             self.window.destroy()
         except Exception as e:
             logging.error(f"Error closing window: {e}")
+
+def get_serial_ports() -> list:
+    """Lists available serial ports.
+
+    :return: A list of serial port names available on the system.
+    """
+    ports = serial.tools.list_ports.comports()
+    return [port.device for port in ports]
 
 if __name__ == "__main__":
     root = ctk.CTk()

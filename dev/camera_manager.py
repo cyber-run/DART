@@ -1,21 +1,26 @@
+import os
+import time
+import cv2
+import logging
 from threading import Thread
 from queue import Queue
-import os, time, sys
 import EasyPySpin
-import logging
-import cv2 
 
 class CameraManager:
     def __init__(self):
         self.cap = None
         self.initialize_camera()
-        self.image_folder = "images"
+        self.frame_queue = Queue()
+        self.recording = False
+        self.writer = None
+        self.latest_frame = None  # Add an attribute to store the latest frame
 
     def initialize_camera(self):
         try:
             self.cap = EasyPySpin.VideoCapture(0)
-            if not self.cap.isOpened():  # Check if the camera has been opened
-                self.cap.start()  # Start the camera
+            if not self.cap.isOpened():  # Check if the camera has been opened successfully
+                logging.error("Camera could not be opened.")
+                return
             self.configure_camera()
         except Exception as e:
             logging.error(f"Failed to initialize camera: {e}")
@@ -24,70 +29,86 @@ class CameraManager:
 
     def configure_camera(self):
         if self.cap and self.cap.isOpened():
-            desired_width, desired_height = 960, 720
-            self.set_camera_properties(desired_width, desired_height)
-            self.center_roi_on_sensor(desired_width, desired_height)
-        pass
-
-    def set_camera_properties(self, width, height):
-        try:
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        except Exception as e:
-            logging.error(f"Failed to set camera properties: {e}")
-
-    def center_roi_on_sensor(self, roi_width, roi_height):
-        try:
-            sensor_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-            sensor_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-            offset_x, offset_y = (sensor_width - roi_width) // 2, (sensor_height - roi_height) // 2
-            self.cap.set_pyspin_value("OffsetX", offset_x)
-            self.cap.set_pyspin_value("OffsetY", offset_y)
-            self.cap.set_pyspin_value("Width", roi_width)
-            self.cap.set_pyspin_value("Height", roi_height)
-        except Exception as e:
-            logging.error(f"Failed to center ROI on sensor: {e}")
+            pass # Add camera configuration code here
 
     def read_frame(self):
         try:
             if self.cap and self.cap.isOpened():
-                return self.cap.read()
-        except _PySpin.SpinnakerException as e:
+                frame  = self.cap.read()
+                frame = cv2.resize(frame, None, fx=0.25, fy=0.25)
+                return frame
+        except Exception as e:
             logging.error(f"Error reading frame: {e}")
-            # Implement reconnection logic or notify the user
         return False, None
+
+    def start_recording(self, filename, fps=200, frame_size=(1440, 1080)):
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Change to MJPG for wider compatibility
+        filename = filename.replace('.avi', '.mp4')  # Ensure MP4 extension
+        self.writer = cv2.VideoWriter(filename, int(fourcc), fps, frame_size)
+        if not self.writer.isOpened():
+            logging.error("Failed to open video writer. Check codec and file path.")
+            return  # Stop the recording process if writer fails to initialize
+        self.recording = True
+        Thread(target=self.capture_frames, daemon=True).start()
+        Thread(target=self.write_frames, daemon=True).start()
+
+    def capture_frames(self):
+        while self.recording:
+            logging.info("Capturing frame...")
+            ret, frame = self.read_frame()
+            if ret:
+                self.latest_frame = frame  # Update the latest frame
+                self.frame_queue.put(frame)
+                logging.info("Queueing frame.")
+    
+    def get_latest_frame(self):
+        """Retrieve the latest frame captured by the camera."""
+        return self.latest_frame
+
+    def write_frames(self):
+        while self.recording or not self.frame_queue.empty():
+            frame = self.frame_queue.get()
+            if frame is not None and frame.size != 0:
+                logging.info("Writing frame...")
+                # Display and save the resulting frame    
+                self.writer.write(frame)
+
+    def stop_recording(self):
+        self.recording = False
+        time.sleep(0.5)  # Give time for threads to finish
+        self.writer.release()
+        self.writer = None
 
     def release(self):
         if self.cap:
             self.cap.release()
 
-def write_images(q, camera_manager):
-    while True:
-        frame, filename = q.get()
-        cv2.imwrite(filename, frame)
-        q.task_done()
-
-def camera_record():
-    logging.basicConfig(level=logging.ERROR)
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     camera_manager = CameraManager()
-    q = Queue()
-    writer = Thread(target=write_images, args=(q, camera_manager))
-    writer.daemon = True
-    writer.start()
+    time.sleep(5)  # Allow time for the camera to initialize
+    width  = int(camera_manager.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(camera_manager.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps_x = camera_manager.cap.get(cv2.CAP_PROP_FPS)
 
-    try:
-        while True:
-            _, frame = camera_manager.read_frame()
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            filename = os.path.join(camera_manager.image_folder, f"image_{timestamp}.bmp")
-            q.put((frame, filename))
-
-    except KeyboardInterrupt:
-        camera_manager.release()
-        print("Camera released successfully\n")
-        sys.exit(0)
-
-    except Exception as e:
-        camera_manager.release()
-        print(f"An error occurred: {e}")
-        sys.exit(1)
+    print(f"Camera initialized with resolution {width}x{height} and FPS {fps_x}")
+    
+    video_filename = os.path.join(os.getcwd(), "recorded_video.mp4")  # Ensure correct extension for codec
+    camera_manager.start_recording(video_filename, fps=fps_x, frame_size=(width, height))
+    
+    start_time = time.time()
+    duration = 10  # Record for 10 seconds
+    
+    while time.time() - start_time < duration:
+        frame = camera_manager.get_latest_frame()
+        logging.info("Getting latest frame...")
+        if frame is not None:
+            print("Displaying frame...")  # Debug print
+            cv2.imshow("Frame", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to exit early
+                break
+    
+    camera_manager.stop_recording()
+    camera_manager.release()
+    cv2.destroyAllWindows()  # Close the window after recording is stopped
+    print("Recording stopped, video saved to:", video_filename)
