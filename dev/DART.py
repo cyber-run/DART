@@ -50,6 +50,7 @@ class DART:
         self.calibrator = Calibrator()
 
         self.selected_com_port = ctk.StringVar(value="")
+        self.selected_camera = ctk.StringVar(value="")
         
         try:
             self.target = MoCap(stream_type='3d')
@@ -59,7 +60,6 @@ class DART:
             self.target = None
 
         self.dyna = None
-
 
     def init_gui_flags(self):
         # Camera/image functionality
@@ -71,6 +71,9 @@ class DART:
         self.show_crosshair = tk.BooleanVar(value=False)
         self.threshold_flag = tk.BooleanVar(value=False)
         self.detect_flag = tk.BooleanVar(value=False)
+
+        # GUI icons
+        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png").resize((16, 16)))
 
         # Motor control values
         self.pan_value = 0
@@ -84,17 +87,23 @@ class DART:
         dyn_control_frame = ctk.CTkFrame(self.window)
         dyn_control_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)  # Increase vertical padding
 
+        # Get available serial ports for combo box
         serial_ports = get_serial_ports()
 
-        # Assuming `dyn_control_frame` is the frame you want to add the combobox to
-        self.com_port_combobox = ctk.CTkComboBox(dyn_control_frame, values=serial_ports,
+        # Serial port frame
+        serial_frame = ctk.CTkFrame(dyn_control_frame)
+        serial_frame.pack(side="top", padx=10, pady=10)
+
+        # Combo box for selecting the COM port
+        self.com_port_combobox = ctk.CTkComboBox(serial_frame, width=100, values=serial_ports,
                                                 variable=self.selected_com_port,
                                                 command=lambda choice: self.connect_dyna_controller())
-        self.com_port_combobox.pack(side="top", padx=10, pady=10)
+        self.com_port_combobox.pack(side="left", padx=10, pady=10)
 
-        # Update the combobox with available ports each time the window is shown or refreshed
-        self.update_serial_ports_dropdown()
-
+        # Button refresh serial port list
+        self.serial_refresh = ctk.CTkButton(serial_frame, width=28, text="", 
+                                            image=self.refresh_icon, command=self.update_serial_ports_dropdown)
+        self.serial_refresh.pack(side="left", padx=10, pady=10)
 
         # Frame for pan slider and label
         pan_frame = ctk.CTkFrame(dyn_control_frame)
@@ -126,31 +135,51 @@ class DART:
         camera_control_frame = ctk.CTkFrame(self.window)
         camera_control_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)  # Increase vertical padding
 
-        # Button to start/stop live feed
-        self.toggle_video_button = ctk.CTkButton(camera_control_frame, text="Start Live Feed", command=self.toggle_video_feed)
-        self.toggle_video_button.pack(side="left", padx=10)
+        # Camera combo box frame
+        cam_frame = ctk.CTkFrame(camera_control_frame)
+        cam_frame.pack(side="left", padx=10, pady = 10)
 
-        # Button to start/stop saving images
-        self.record_button = ctk.CTkButton(camera_control_frame, text="Start Saving Images", command=self.toggle_image_saving)
-        self.record_button.pack(side="left", padx=10)
+        # Dropdown comobo box for selecting the camera
+        self.cam_combobox = ctk.CTkComboBox(cam_frame, width=120, values=[],
+                                                variable=self.selected_camera,
+                                                command=self.connect_camera)
+        self.cam_combobox.pack(side="left", padx=10, pady=10)
+
+        # Button to refresh camera list
+        self.cam_refresh = ctk.CTkButton(cam_frame, width=28, text="", image=self.refresh_icon, command=self.update_camera_dropdown)
+        self.cam_refresh.pack(side="left", padx=10, pady=10)
+
+        # Button to start/stop live feed
+        self.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", command=self.toggle_video_feed)
+        self.toggle_video_button.pack(side="left", padx=10)
 
         # Frame for exposure slider and label
         exposure_frame = ctk.CTkFrame(camera_control_frame)
         exposure_frame.pack(side="left", padx=10, pady = 10)
-        self.exposure_slider = ctk.CTkSlider(exposure_frame, from_=4, to=10000, command=self.adjust_exposure)
-        self.exposure_slider.set(50)
+        self.exposure_slider = ctk.CTkSlider(exposure_frame, from_=4, to=4000, command=self.adjust_exposure)
+        self.exposure_slider.set(1000)
         self.exposure_slider.pack(padx =5, pady=5)
-        self.exposure_label = ctk.CTkLabel(exposure_frame, text="Exposure (us): 57500")
+        self.exposure_label = ctk.CTkLabel(exposure_frame, text="Exposure (us): 1000")
         self.exposure_label.pack()
  
         # Frame for gain slider and label
         gain_frame = ctk.CTkFrame(camera_control_frame)
         gain_frame.pack(side="left", padx=10, pady=10)
-        self.gain_slider = ctk.CTkSlider(gain_frame, from_=0, to=50, command=self.adjust_gain)
+        self.gain_slider = ctk.CTkSlider(gain_frame, from_=0, to=47, command=self.adjust_gain)
         self.gain_slider.set(25) 
         self.gain_slider.pack(padx=5, pady=5)
-        self.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 25")
+        self.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 10")
         self.gain_label.pack()
+
+        # Button to start/stop saving images
+        self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", command=self.toggle_image_saving)
+        self.record_button.pack(side="left", padx=10)
+
+        # FPS indicator display
+        fps_frame = ctk.CTkFrame(camera_control_frame)
+        fps_frame.pack(side="right", padx=10, pady=10)
+        self.fps_label = ctk.CTkLabel(fps_frame, text="FPS: 220")
+        self.fps_label.pack(padx=5, pady=5)
 
         ################## Frame for image processing detect ##################
         img_processing_frame = ctk.CTkFrame(self.window)
@@ -219,14 +248,15 @@ class DART:
 
     def toggle_video_feed(self):
         self.is_live = not self.is_live
-        self.toggle_video_button.configure(text="Stop Live Feed" if self.is_live else "Start Live Feed")
+        self.toggle_video_button.configure(text="Stop" if self.is_live else "Start")
+        self.update_fps_label()
         if self.is_live:
             self.update_video_label()
 
     def toggle_image_saving(self):
         self.camera_manager.release()
         self.is_saving_images = not self.is_saving_images
-        self.record_button.configure(text="Stop Saving Images" if self.is_saving_images else "Start Saving Images")
+        self.record_button.configure(text="Stop" if self.is_saving_images else "Record")
 
     def adjust_gain(self, gain_value: float):
         if self.camera_manager.cap:
@@ -236,11 +266,20 @@ class DART:
             except AttributeError:
                 logging.error("Gain not set.")
 
+    def update_fps_label(self):
+        if self.camera_manager.cap:
+            try:
+                fps = self.camera_manager.cap.get(cv2.CAP_PROP_FPS)
+                self.fps_label.configure(text=f"FPS: {round(float(fps),3)}")
+            except AttributeError:
+                logging.error("FPS not set.")
+
     def adjust_exposure(self, exposure_value: float):
         if self.camera_manager.cap:
             try:
                 self.camera_manager.cap.set(cv2.CAP_PROP_EXPOSURE, exposure_value)
                 self.exposure_label.configure(text=f"Exposure (us): {exposure_value}")
+                self.update_fps_label()
             except AttributeError:
                 logging.error("Exposure not set.")
 
@@ -253,6 +292,7 @@ class DART:
                 
                 # Process the frame with all the selected options
                 processed_frame = self.image_pro.process_frame(frame)
+                processed_frame = cv2.resize(processed_frame, (1008, 756))
                 self.display_frame(processed_frame)
                 
                 # Save the original or processed frame if needed
@@ -285,10 +325,6 @@ class DART:
         """Updates the list of serial ports in the dropdown."""
         serial_ports = get_serial_ports()
         self.com_port_combobox.configure(values=serial_ports)
-        if serial_ports:
-            self.com_port_combobox.set(serial_ports[0])
-        else:
-            self.com_port_combobox.set("")
 
     def connect_dyna_controller(self):
         """Initializes or reconnects the DynaController with the selected COM port."""
@@ -307,10 +343,27 @@ class DART:
             logging.error(f"Error connecting to Dynamixel controller: {e}")
             self.dyna = None
 
+    def update_camera_dropdown(self):
+        cameras = self.camera_manager.get_available_cameras()
+        self.cam_combobox.configure(values=cameras)
+        if cameras:
+            self.cam_combobox.set(cameras[0])
+        else:
+            self.cam_combobox.set("")
+
+    def connect_camera(self, event=None):
+        selected_camera = self.selected_camera.get()
+        if selected_camera:
+            camera_index = int(selected_camera.split(" ")[1])
+            self.camera_manager.connect_camera(camera_index)
+        else:
+            logging.error("No camera selected.")
+
     def set_pan(self, value: float):
         if self.dyna is not None:
-            self.pan_value = int(value)
-            self.pan_label.configure(text=f"Pan angle: {int(value)}")
+            value = round(value, 3)
+            self.pan_value = value
+            self.pan_label.configure(text=f"Pan angle: {value}")
             angle = vm2.num_to_range(self.pan_value, -45, 45, 202.5, 247.5)
             self.dyna.set_pos(1, angle)
         else:
@@ -318,8 +371,9 @@ class DART:
 
     def set_tilt(self, value: float):
         if self.dyna is not None:
-            self.tilt_value = int(value)
-            self.tilt_label.configure(text=f"Tilt angle: {int(value)}")
+            value = round(value, 3)
+            self.tilt_value = value
+            self.tilt_label.configure(text=f"Tilt angle: {value}")
             angle = vm2.num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
             self.dyna.set_pos(2, angle)
         else:

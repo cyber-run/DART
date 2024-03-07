@@ -14,10 +14,26 @@ class CameraManager:
         self.recording = False
         self.writer = None
         self.latest_frame = None  # Add an attribute to store the latest frame
+    
+    def get_available_cameras(self):
+        cameras = []
+        i = 0
+        while True:
+            try:
+                cap = EasyPySpin.VideoCapture(i)
+                if cap.isOpened():
+                    cameras.append(f"Camera {i}")
+                    cap.release()
+                else:
+                    break
+            except:
+                break
+            i += 1
+        return cameras
 
-    def initialize_camera(self):
+    def initialize_camera(self, camera_index=0):
         try:
-            self.cap = EasyPySpin.VideoCapture(0)
+            self.cap = EasyPySpin.VideoCapture(camera_index)
             if not self.cap.isOpened():  # Check if the camera has been opened successfully
                 logging.error("Camera could not be opened.")
                 return
@@ -27,15 +43,19 @@ class CameraManager:
             if self.cap is not None:
                 self.cap.release()
 
+    def connect_camera(self, camera_index):
+        self.release()
+        self.initialize_camera(camera_index)
+
     def configure_camera(self):
         if self.cap and self.cap.isOpened():
-            pass # Add camera configuration code here
+            self.cap.set(cv2.CAP_PROP_FPS, True)  # Set the camera to high FPS mode (if available)
+            self.cap.set(cv2.CAP_PROP_FPS, 220)  # Set the FPS to 220
 
     def read_frame(self):
         try:
             if self.cap and self.cap.isOpened():
                 frame  = self.cap.read()
-                frame = cv2.resize(frame, None, fx=0.25, fy=0.25)
                 return frame
         except Exception as e:
             logging.error(f"Error reading frame: {e}")
