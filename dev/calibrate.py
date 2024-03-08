@@ -19,7 +19,7 @@ class Calibrator:
         self.calibrated = False
 
         # Load calibration data if it exists
-        calib_data_path = 'config/calib_data.pkl'
+        calib_data_path = 'dev/config/calib_data.pkl'
         if os.path.exists(calib_data_path):
             with open(calib_data_path, 'rb') as f:
                 self.local_origin, self.rotation_matrix = pickle.load(f)
@@ -63,7 +63,7 @@ class Calibrator:
         self.rotation_matrix = np.column_stack((x_axis, y_axis, z_axis))
 
         os.makedirs('config', exist_ok=True)  # Ensure the config directory exists
-        with open('config/calib_data.pkl', 'wb') as f:
+        with open('dev/config/calib_data.pkl', 'wb') as f:
             pickle.dump((self.local_origin, self.rotation_matrix), f)
             logging.info("Calibration data saved successfully.")
 

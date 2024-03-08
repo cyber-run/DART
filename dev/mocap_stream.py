@@ -14,13 +14,12 @@ class MoCap(Thread):
 
     def __init__(self, qtm_ip="192.168.100.1", stream_type='6d'):
         """
-        Constructs QtmWrapper object
-        :param position: 6D body position
-        :param yaw: 6D body yaw
-        :param height: For drone altitude control
-        :param qtm_ip: IP of QTM instance, but doesn't seem to matter
-        :param stream_type: Specify components to receive,
-                            see: https://github.com/qualisys/qualisys_python_sdk/blob/master/qtm/qrt.py
+        Constructs QtmWrapper object.
+
+        Args:\n
+        `qtm_ip` IP of QTM instance, but doesn't seem to matter\n
+        `stream_type` Specify components to receive,
+        see: https://github.com/qualisys/qualisys_python_sdk/tree/afce59ea6be47974029d476960d960c05009ef60
         """
 
         Thread.__init__(self)

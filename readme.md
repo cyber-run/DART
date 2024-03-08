@@ -26,10 +26,12 @@
 
 - [x] Fix bug where calibration angle carries over to another run in session
 
-- [ ] Add stop button for tracking -> terminate process
+- [x] Add stop button for tracking -> terminate process
 
-- [ ] Refactor code to be more modular and readable and create dev branch
+- [x] Refactor code to be more modular and readable and create dev branch
 
 - [ ] take the mean of multiple markers
 
 - [ ] tilt calibration
+
+- [ ] Add cd and user 

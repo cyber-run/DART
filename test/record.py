@@ -1,27 +1,49 @@
 import cv2
-import time
-import EasyPySpin
- 
-capture = EasyPySpin.VideoCapture(0)
-fps_x = capture.get(cv2.CAP_PROP_FPS)
-time.sleep(3)
-ret, frame = capture.read()
+import PySpin
+import time, datetime
+import logging
 
-# Correct fourcc code for MacOS and correct frame size
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-videoWriter = cv2.VideoWriter('test/video.mp4', fourcc, fps_x, (frame.shape[1], frame.shape[0]))
- 
-while True:
-    ret, frame = capture.read()
-     
-    if ret:
-        cv2.imshow('video', frame)
-        videoWriter.write(frame)
- 
-    if cv2.waitKey(1) == 27:
-        break
- 
-capture.release()
-videoWriter.release()
- 
-cv2.destroyAllWindows()
+logging.basicConfig(level=logging.INFO)
+
+record_time = 1
+frequency = 220
+time_delay = 0
+
+system = PySpin.System.GetInstance()
+cam_list = system.GetCameras()     
+cam0 = cam_list.GetByIndex(0)
+cam0.Init()
+cam0.BeginAcquisition()
+
+head_video0 = []
+
+current_time = time.time()
+
+previous_time = current_time
+
+for n in range(record_time*frequency):
+    head_video0.append(cv2.cvtColor(cam0.GetNextImage().GetNDArray(), cv2.COLOR_BGR2RGB))
+
+    previous_time = current_time
+    current_time = time.time()
+    time_delay = 0.99*time_delay + 0.01*(current_time - previous_time)
+
+    if time_delay != 0:
+        print(1/time_delay)
+
+cam0.EndAcquisition()
+previous_time = time.time()
+
+fourcc = cv2.VideoWriter_fourcc(*'XVID')
+
+
+out0 = cv2.VideoWriter("dev/videos/Head_0.avi", fourcc, 220, (cam0.Width.GetValue(), cam0.Height.GetValue()))
+for image_data0 in head_video0:
+    #image_rgb0 = cv2.cvtColor(image_data0, cv2.COLOR_BGR2RGB)
+    out0.write(image_data0)
+    # send_frame(ControlIP, ControlPort, image_data0)
+    # if receive_string(CameraPort) != "frame received":
+        # print("error")
+
+out0.release()
+print("Save time: "+str(time.time() - previous_time))

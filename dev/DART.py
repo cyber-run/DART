@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
 from dyna_controller import DynaController
 from camera_manager import CameraManager
@@ -26,11 +26,8 @@ class DART:
         self.init_window(window)
         self.init_hardware()
 
-        self.init_gui_flags()
+        self.init_params()
         self.setup_gui_elements()
-
-        self.set_pan(0)
-        self.set_tilt(0)
 
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.window.mainloop()
@@ -52,16 +49,11 @@ class DART:
         self.selected_com_port = ctk.StringVar(value="")
         self.selected_camera = ctk.StringVar(value="")
         
-        try:
-            self.target = MoCap(stream_type='3d')
-            self.target.calibration_target = True
-        except Exception as e:
-            logging.error(f"Error connecting to QTM: {e}")
-            self.target = None
+        self.target = None
 
         self.dyna = None
 
-    def init_gui_flags(self):
+    def init_params(self):
         # Camera/image functionality
         self.is_live = False
         self.is_saving_images = False
@@ -73,11 +65,18 @@ class DART:
         self.detect_flag = tk.BooleanVar(value=False)
 
         # GUI icons
-        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png").resize((16, 16)))
+        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png").resize((96, 96)))
+        self.sync_icon = ctk.CTkImage(Image.open("dev/icons/sync.png").resize((96, 96)))
+        self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png").resize((96, 96)))
+        self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png").resize((96, 96)))
+        self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png").resize((96, 96)))
 
         # Motor control values
         self.pan_value = 0
         self.tilt_value = 0
+
+        # Tracking process flag
+        self.track_process = None
 
     def setup_gui_elements(self):
         self.video_label = ctk.CTkLabel(self.window, text="")
@@ -146,11 +145,13 @@ class DART:
         self.cam_combobox.pack(side="left", padx=10, pady=10)
 
         # Button to refresh camera list
-        self.cam_refresh = ctk.CTkButton(cam_frame, width=28, text="", image=self.refresh_icon, command=self.update_camera_dropdown)
+        self.cam_refresh = ctk.CTkButton(cam_frame, width=28, text="", image=self.refresh_icon, 
+                                         command=self.update_camera_dropdown)
         self.cam_refresh.pack(side="left", padx=10, pady=10)
 
         # Button to start/stop live feed
-        self.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", command=self.toggle_video_feed)
+        self.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", image=self.play_icon, 
+                                                 command=self.toggle_video_feed)
         self.toggle_video_button.pack(side="left", padx=10)
 
         # Frame for exposure slider and label
@@ -172,6 +173,10 @@ class DART:
         self.gain_label.pack()
 
         # Button to start/stop saving images
+        self.file_button = ctk.CTkButton(camera_control_frame, width=28, text="", image = self.folder_icon, command=select_file)
+        self.file_button.pack(side="left", padx=10)
+
+        # Button to start/stop saving images
         self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", command=self.toggle_image_saving)
         self.record_button.pack(side="left", padx=10)
 
@@ -184,6 +189,11 @@ class DART:
         ################## Frame for image processing detect ##################
         img_processing_frame = ctk.CTkFrame(self.window)
         img_processing_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)  # Increase vertical padding
+
+        # Button to start/stop saving images
+        self.mocap_button = ctk.CTkButton(img_processing_frame, width=80, text="MoCap", image=self.sync_icon, 
+                                          command=self.connect_mocap)
+        self.mocap_button.pack(side="left", padx=10)
 
         self.crosshair_checkbox = ctk.CTkCheckBox(
             img_processing_frame,
@@ -229,7 +239,17 @@ class DART:
         self.calibrator.run(p1, p2)
 
     def track(self):
-        if self.calibrator.calibrated:
+        if self.track_process is not None:
+            self.track_process.terminate()
+            self.track_process.join()
+            self.track_process = None
+
+            self.connect_dyna_controller()
+
+            self.track_button.configure(text="Track", image=self.play_icon)
+            return
+        
+        if self.calibrator.calibrated and self.track_process is None:
             # Close QTM connections
             self.target._close()
             self.target.close()
@@ -237,10 +257,10 @@ class DART:
             # Close serial port
             self.dyna.close_port()
 
-            time.sleep(1) # HACK: Add small blocking delay to allow serial port to close
-
             self.track_process = Process(target=dart_track)
             self.track_process.start()
+
+            self.track_button.configure(text="Stop", image=self.stop_icon)
         else:
             # Add popup window to notify user that DART is not calibrated
             CTkMessagebox(title="Error", message="DART Not Calibrated", icon="cancel")
@@ -249,6 +269,7 @@ class DART:
     def toggle_video_feed(self):
         self.is_live = not self.is_live
         self.toggle_video_button.configure(text="Stop" if self.is_live else "Start")
+        self.toggle_video_button.configure(image=self.stop_icon if self.is_live else self.play_icon)
         self.update_fps_label()
         if self.is_live:
             self.update_video_label()
@@ -262,7 +283,7 @@ class DART:
         if self.camera_manager.cap:
             try:
                 self.camera_manager.cap.set(cv2.CAP_PROP_GAIN, float(gain_value)) # dB
-                self.gain_label.configure(text=f"Gain (dB): {gain_value}")
+                self.gain_label.configure(text=f"Gain (dB): {round(gain_value, 2)}")
             except AttributeError:
                 logging.error("Gain not set.")
 
@@ -285,14 +306,13 @@ class DART:
 
     def update_video_label(self):
         if self.is_live:
-            ret, frame = self.camera_manager.read_frame()
+            ret, frame = self.camera_manager.cap.read()
             if ret:
                 # Flip the frame horizontally
                 frame = cv2.flip(frame, 1)
                 
                 # Process the frame with all the selected options
                 processed_frame = self.image_pro.process_frame(frame)
-                processed_frame = cv2.resize(processed_frame, (1008, 756))
                 self.display_frame(processed_frame)
                 
                 # Save the original or processed frame if needed
@@ -301,11 +321,17 @@ class DART:
             self.window.after(30, self.update_video_label)
 
     def display_frame(self, frame):
-        cv_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pil_img = Image.fromarray(cv_img)
-        imgtk = ImageTk.PhotoImage(image=pil_img)
-        self.video_label.imgtk = imgtk
-        self.video_label.configure(image=imgtk)
+        # Convert to cv2 img
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Convert to pil img
+        img = Image.fromarray(img)
+
+        # Convert to tk img
+        img = ctk.CTkImage(img, size = (1008, 756))
+
+        # Update label with new image
+        self.video_label.configure(image=img)
 
     def save_frame(self, frame):
         if self.is_saving_images:
@@ -333,9 +359,15 @@ class DART:
             if selected_port:
                 self.dyna = DynaController(com_port=selected_port)
                 self.dyna.open_port()
+
+                self.dyna.set_gains(1, 650, 1300, 1200)
+                self.dyna.set_gains(2, 1400, 500, 900)
+
                 self.dyna.set_op_mode(1, 3)  # Pan to position control
                 self.dyna.set_op_mode(2, 3)  # Tilt to position control
+
                 self.dyna.set_sync_pos(225, 315)
+                
                 logging.info(f"Connected to Dynamixel controller on {selected_port}.")
             else:
                 logging.error("No COM port selected.")
@@ -358,6 +390,14 @@ class DART:
             self.camera_manager.connect_camera(camera_index)
         else:
             logging.error("No camera selected.")
+
+    def connect_mocap(self):
+        try:
+            self.target = MoCap(stream_type='3d')
+            self.target.calibration_target = True
+        except Exception as e:
+            logging.error(f"Error connecting to QTM: {e}")
+            self.target = None
 
     def set_pan(self, value: float):
         if self.dyna is not None:
@@ -400,7 +440,7 @@ class DART:
             logging.error(f"Error closing serial port: {e}")
 
         # Terminate subprocess
-        if hasattr(self, 'track_process') and self.track_process.is_alive():
+        if self.track_process is not None and hasattr(self, 'track_process') and self.track_process.is_alive():
             try:
                 self.track_process.terminate()
                 self.track_process.join()  # Wait for the process to terminate
@@ -411,6 +451,10 @@ class DART:
             self.window.destroy()
         except Exception as e:
             logging.error(f"Error closing window: {e}")
+
+def select_file():
+        filename = ctk.filedialog.askdirectory()
+        print(filename)
 
 def get_serial_ports() -> list:
     """Lists available serial ports.

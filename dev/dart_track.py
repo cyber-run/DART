@@ -19,8 +19,8 @@ class DynaTracker:
     '''
     def __init__(self, com_port='COM5'):
         # Load calibration data if it exists
-        if os.path.exists('config\calib_data.pkl'):
-            with open('config\calib_data.pkl', 'rb') as f:
+        if os.path.exists('dev/config/calib_data.pkl'):
+            with open('dev/config/calib_data.pkl', 'rb') as f:
                 self.local_origin, self.rotation_matrix = pickle.load(f)
                 logging.info("Calibration data loaded successfully.")
         else:
