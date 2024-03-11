@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 import cProfile, time, cv2, os
 from dyna_controller import DynaController
@@ -16,6 +16,7 @@ from mocap_stream import *
 import vec_math2 as vm2
 import tkinter as tk
 import numpy as np
+
 
 
 class DART:
@@ -238,6 +239,12 @@ class DART:
         self.strength_label = ctk.CTkLabel(strength_frame, text="Strength: 60")
         self.strength_label.pack()
 
+        # FPS indicator display
+        num_marker_frame = ctk.CTkFrame(img_processing_frame)
+        num_marker_frame.pack(side="right", padx=10, pady=10)
+        self.num_marker_label = ctk.CTkLabel(num_marker_frame, text="No. Markers: 0")
+        self.num_marker_label.pack(padx=5, pady=5)
+
     def calibrate(self):
         p1 = np.array(self.target.position)
         p2 = np.array(self.target.position2)
@@ -348,6 +355,12 @@ class DART:
 
             self.window.after(30, self.update_video_label)
 
+    def update_num_marker_label(self):
+        if self.target is not None:
+            self.num_marker_label.configure(text=f"No. Markers: {self.target.num_markers}")
+            # Update number of markers at 5Hz -> this is a good proof of concept for marker averaging
+            self.window.after(200, self.update_num_marker_label)
+
     def display_frame(self, frame):
         # Convert to cv2 img
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -417,6 +430,8 @@ class DART:
         try:
             self.target = MoCap(stream_type='3d')
             self.target.calibration_target = True
+            self.update_num_marker_label()
+            logging.info("Connected to QTM.")
         except Exception as e:
             logging.error(f"Error connecting to QTM: {e}")
             self.target = None

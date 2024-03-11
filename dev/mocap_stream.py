@@ -39,6 +39,7 @@ class MoCap(Thread):
         self.pitch = 0
         self.lost = False
         self.calibration_target = False
+        self.num_markers = 0
 
         self.start()
 
@@ -81,8 +82,7 @@ class MoCap(Thread):
 
     def _on_packet(self, packet) -> None:
         """
-        Process 6D packet stream into Pose object and pass on.
-        Parameters
+        Process a packet stream 6D or 3D data.
         ----------
         packet : QRTPacket
             Incoming packet from QTM
@@ -115,6 +115,7 @@ class MoCap(Thread):
 
             pos = new_component[0]
             self.position = [pos.x, pos.y, pos.z]
+            self.num_markers = len(new_component)
 
             # Ensure there is more than one component before accessing it
             if self.calibration_target and len(new_component) > 1:
