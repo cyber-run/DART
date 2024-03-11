@@ -111,24 +111,27 @@ class CameraManager:
         self.frame_queue.put(None)
 
     def write_frames(self):
-        while True:
-            frame = self.frame_queue.get()
-
-            if frame is None:
-                break  # Stop writing when the sentinel value is received
-
-            if frame is not None and frame.size != 0:
-                logging.info("Writing frame...")
-                # Display and save the resulting frame    
-                self.writer.write(frame)
+        while not self.frame_queue.empty() or self.recording:
+            if not self.frame_queue.empty():
+                frame = self.frame_queue.get()
+                if frame is not None and frame.size != 0:
+                    logging.info("Writing frame...")
+                    self.writer.write(frame)
+            else:
+                time.sleep(0.001)  # Add a small delay to avoid excessive CPU usage
 
         self.writer.release()
+        
+        # Execute the callback function if provided
+        if self.on_write_finished:
+            self.on_write_finished()
+
+    def set_on_write_finished(self, callback):
+        self.on_write_finished = callback
 
     def stop_recording(self):
         self.recording = False
-        if self.writing_thread is not None:
-            self.writing_thread.join()
-        self.writer = None
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR)

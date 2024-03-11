@@ -53,7 +53,7 @@ class DART:
     def init_params(self):
         # Camera/image functionality
         self.is_live = False
-        self.video_folder = "dev/videos"
+        self.video_path = "dev/videos"
 
         # Image processing GUI flags
         self.show_crosshair = tk.BooleanVar(value=False)
@@ -66,6 +66,7 @@ class DART:
         self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png").resize((96, 96)))
         self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png").resize((96, 96)))
         self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png").resize((96, 96)))
+        self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png").resize((96, 96)))
 
         # Motor control values
         self.pan_value = 0
@@ -93,12 +94,12 @@ class DART:
         self.com_port_combobox = ctk.CTkComboBox(serial_frame, width=100, values=serial_ports,
                                                 variable=self.selected_com_port,
                                                 command=lambda choice: self.connect_dyna_controller())
-        self.com_port_combobox.pack(side="left", padx=10, pady=10)
+        self.com_port_combobox.pack(side="left", padx=5, pady=5)
 
         # Button refresh serial port list
         self.serial_refresh = ctk.CTkButton(serial_frame, width=28, text="", 
                                             image=self.refresh_icon, command=self.update_serial_ports_dropdown)
-        self.serial_refresh.pack(side="left", padx=10, pady=10)
+        self.serial_refresh.pack(side="left", padx=5, pady=5)
 
         # Frame for pan slider and label
         pan_frame = ctk.CTkFrame(dyn_control_frame)
@@ -135,15 +136,15 @@ class DART:
         cam_frame.pack(side="left", padx=10, pady = 10)
 
         # Dropdown comobo box for selecting the camera
-        self.cam_combobox = ctk.CTkComboBox(cam_frame, width=120, values=[],
+        self.cam_combobox = ctk.CTkComboBox(cam_frame, width=100, values=[],
                                                 variable=self.selected_camera,
                                                 command=self.connect_camera)
-        self.cam_combobox.pack(side="left", padx=10, pady=10)
+        self.cam_combobox.pack(side="left", padx=5, pady=5)
 
         # Button to refresh camera list
         self.cam_refresh = ctk.CTkButton(cam_frame, width=28, text="", image=self.refresh_icon, 
                                          command=self.update_camera_dropdown)
-        self.cam_refresh.pack(side="left", padx=10, pady=10)
+        self.cam_refresh.pack(side="left", padx=5, pady=5)
 
         # Button to start/stop live feed
         self.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", image=self.play_icon, 
@@ -153,7 +154,7 @@ class DART:
         # Frame for exposure slider and label
         exposure_frame = ctk.CTkFrame(camera_control_frame)
         exposure_frame.pack(side="left", padx=10, pady = 10)
-        self.exposure_slider = ctk.CTkSlider(exposure_frame, from_=4, to=4000, command=self.adjust_exposure)
+        self.exposure_slider = ctk.CTkSlider(exposure_frame, width =140, from_=4, to=4000, command=self.adjust_exposure)
         self.exposure_slider.set(1000)
         self.exposure_slider.pack(padx =5, pady=5)
         self.exposure_label = ctk.CTkLabel(exposure_frame, text="Exposure (us): 1000")
@@ -162,24 +163,32 @@ class DART:
         # Frame for gain slider and label
         gain_frame = ctk.CTkFrame(camera_control_frame)
         gain_frame.pack(side="left", padx=10, pady=10)
-        self.gain_slider = ctk.CTkSlider(gain_frame, from_=0, to=47, command=self.adjust_gain)
+        self.gain_slider = ctk.CTkSlider(gain_frame, width =140, from_=0, to=47, command=self.adjust_gain)
         self.gain_slider.set(25) 
         self.gain_slider.pack(padx=5, pady=5)
         self.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 10")
         self.gain_label.pack()
 
-        # Button to start/stop saving images
-        self.file_button = ctk.CTkButton(camera_control_frame, width=28, text="", image = self.folder_icon, command=select_file)
-        self.file_button.pack(side="left", padx=10)
+        # Frame for video path and file name
+        video_path_frame = ctk.CTkFrame(camera_control_frame)
+        video_path_frame.pack(side="left", padx=10, pady=10)
+
+        # Button to open folder dialog
+        self.file_button = ctk.CTkButton(video_path_frame, width=28, text="", image=self.folder_icon, command=self.select_folder)
+        self.file_button.pack(side="left", padx=5, pady=5)
+
+        # Text entry field for initial file name
+        self.file_name_entry = ctk.CTkEntry(video_path_frame, width=120, placeholder_text="Enter file name")
+        self.file_name_entry.pack(side="left", padx=5, pady=5)
 
         # Button to start/stop saving images
-        self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", command=self.toggle_record)
+        self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", image=self.record_icon, command=self.toggle_record)
         self.record_button.pack(side="left", padx=10)
 
         # FPS indicator display
         fps_frame = ctk.CTkFrame(camera_control_frame)
         fps_frame.pack(side="right", padx=10, pady=10)
-        self.fps_label = ctk.CTkLabel(fps_frame, text="FPS: 220")
+        self.fps_label = ctk.CTkLabel(fps_frame, text="FPS: 220.00")
         self.fps_label.pack(padx=5, pady=5)
 
         ################## Frame for image processing detect ##################
@@ -214,7 +223,7 @@ class DART:
         # Frame for threshold slider and label
         threshold_frame = ctk.CTkFrame(img_processing_frame)
         threshold_frame.pack(side="left", padx=10, pady=10)
-        self.threshold_slider = ctk.CTkSlider(threshold_frame, from_=0, to=255, command=self.set_threshold)
+        self.threshold_slider = ctk.CTkSlider(threshold_frame, width =140, from_=0, to=255, command=self.set_threshold)
         self.threshold_slider.set(70)
         self.threshold_slider.pack(padx =5, pady=5)
         self.threshold_label = ctk.CTkLabel(threshold_frame, text="Threshold: 70")
@@ -223,7 +232,7 @@ class DART:
         # Frame for strength slider and label
         strength_frame = ctk.CTkFrame(img_processing_frame)
         strength_frame.pack(side="left", padx=10, pady=10)
-        self.strength_slider = ctk.CTkSlider(strength_frame, from_=30, to=100, command=self.set_strength)
+        self.strength_slider = ctk.CTkSlider(strength_frame, width =140, from_=30, to=100, command=self.set_strength)
         self.strength_slider.set(60)
         self.strength_slider.pack(padx =5, pady=5)
         self.strength_label = ctk.CTkLabel(strength_frame, text="Strength: 60")
@@ -275,23 +284,34 @@ class DART:
     def toggle_record(self):
         if not self.camera_manager.recording:
             # Start recording
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            filename = os.path.join(self.video_folder, f"video_{timestamp}.mkv")
-
+            timestamp = time.strftime("%Y%m%dT%H%M%S")
+            file_name = self.file_name_entry.get().strip()  # Get the file name from the entry field
+            if file_name:
+                file_name = f"{file_name}_{timestamp}.mkv"
+            else:
+                file_name = f"video_{timestamp}.mkv"
+            filename = os.path.join(self.video_path, file_name)
+            
             # Stop the frame thread if it's running
             if self.camera_manager.is_reading:
                 self.camera_manager.stop_frame_thread()
-
+            
             self.camera_manager.start_recording(filename)
-            self.record_button.configure(text="Stop")
+            self.record_button.configure(text="Stop", image=self.stop_icon)
+            
+            # Set the callback function to be executed when the writing thread finishes
+            self.camera_manager.set_on_write_finished(self.on_write_finished)
         else:
             # Stop recording
             self.camera_manager.stop_recording()
-            self.record_button.configure(text="Record")
+            self.record_button.configure(text="Saving", state="disabled")
 
-            # Restart the frame thread if video feed is live
-            if self.is_live:
-                self.camera_manager.start_frame_thread()
+    def on_write_finished(self):
+        self.record_button.configure(text="Record", image=self.record_icon, state="normal")
+        
+        # Restart the frame thread if video feed is live
+        if self.is_live:
+            self.camera_manager.start_frame_thread()
 
     def adjust_gain(self, gain_value: float):
         if self.camera_manager.cap:
@@ -305,7 +325,7 @@ class DART:
         if self.camera_manager.cap:
             try:
                 fps = self.camera_manager.cap.get(cv2.CAP_PROP_FPS)
-                self.fps_label.configure(text=f"FPS: {round(float(fps),3)}")
+                self.fps_label.configure(text=f"FPS: {round(float(fps),2)}")
             except AttributeError:
                 logging.error("FPS not set.")
 
@@ -313,7 +333,7 @@ class DART:
         if self.camera_manager.cap:
             try:
                 self.camera_manager.cap.set(cv2.CAP_PROP_EXPOSURE, exposure_value)
-                self.exposure_label.configure(text=f"Exposure (us): {exposure_value}")
+                self.exposure_label.configure(text=f"Exposure (us): {round(exposure_value, 2)}")
                 self.update_fps_label()
             except AttributeError:
                 logging.error("Exposure not set.")
@@ -454,9 +474,10 @@ class DART:
         except Exception as e:
             logging.error(f"Error closing window: {e}")
 
-def select_file():
-        filename = ctk.filedialog.askdirectory()
-        print(filename)
+    def select_folder(self):
+            path = ctk.filedialog.askdirectory()
+            
+            self.video_path = path
 
 def get_serial_ports() -> list:
     """Lists available serial ports.
