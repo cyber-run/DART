@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
 import cProfile, time, cv2, os
 from dyna_controller import DynaController
@@ -16,7 +16,7 @@ from mocap_stream import *
 import vec_math2 as vm2
 import tkinter as tk
 import numpy as np
-
+from tsdn import TSDN_Tracker
 
 
 class DART:
@@ -43,6 +43,10 @@ class DART:
 
         # Create an instance of Calibrator
         self.calibrator = Calibrator()
+
+        # Create an instance of tsdn tracker
+        self.tsdn_tracker = TSDN_Tracker('dev/videos/DF_0204.mp4', 270, 360, sim_flag=True)
+        self.tsdn_track_flag = False
 
         self.selected_com_port = ctk.StringVar(value="")
         self.selected_camera = ctk.StringVar(value="")
@@ -127,6 +131,10 @@ class DART:
         # Create a track button
         self.track_button = ctk.CTkButton(dyn_control_frame, text="Track", command=self.track)
         self.track_button.pack(side="top", padx=10, pady=10)
+
+        # Create a tsdn track button
+        self.tsdn_track_button = ctk.CTkButton(dyn_control_frame, text="TSDN Track", command=self.tsdn_track)
+        self.tsdn_track_button.pack(side="top", padx=10, pady=10)
 
         ################## Frame for camera controls ##################
         camera_control_frame = ctk.CTkFrame(self.window)
@@ -277,6 +285,35 @@ class DART:
             # Add popup window to notify user that DART is not calibrated
             CTkMessagebox(title="Error", message="DART Not Calibrated", icon="cancel")
             logging.error("DART is not calibrated.")
+
+    def tsdn_track(self):
+        if self.tsdn_track_flag:
+            self.tsdn_tracker.stop_tracking()
+            self.tsdn_track_button.configure(text="TSDN Track")
+            self.tsdn_track_flag = False
+        else:
+            self.tsdn_tracker.start_tracking()
+            self.tsdn_track_button.configure(text="Stop TSDN Track")
+            self.tsdn_track_flag = True
+            self.update_tsdn_feed()
+
+    def update_tsdn_feed(self):
+        if self.tsdn_track_flag:
+            frame = self.tsdn_tracker.get_frame()
+
+            if frame is not None:
+                # Convert to cv2 img
+                img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # Convert to pil img
+                img = Image.fromarray(frame)
+
+                # Convert to tk img
+                img = ctk.CTkImage(img, size = (1008, 756))
+
+                # Update label with new image
+                self.video_label.configure(image=img)
+                
+            self.window.after(30, self.update_tsdn_feed)
 
     def toggle_video_feed(self):
         self.is_live = not self.is_live
