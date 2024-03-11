@@ -19,6 +19,7 @@ class ImageProcessor:
         :param detect_circle: Boolean flag to determine if circles should be detected.
         :return: The processed frame.
         """
+
         # Convert to grayscale if needed
         if self.needs_grayscale():
             if len(frame.shape) == 3 and frame.shape[2] == 3:  # Check if the image has 3 channels

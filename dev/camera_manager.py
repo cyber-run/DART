@@ -1,10 +1,7 @@
-import os
-import time
-import cv2
-import logging
+import os, time, cv2, logging, EasyPySpin
 from threading import Thread
 from queue import Queue
-import EasyPySpin
+
 
 class CameraManager:
     def __init__(self):
@@ -21,8 +18,12 @@ class CameraManager:
         self.frame_queue = Queue()
         self.recording = False
         self.writer = None
-        self.latest_frame = None
         self.writing_thread = None
+
+
+        self.latest_frame = None
+        self.frame_thread = None
+        self.is_reading = False
     
     def get_available_cameras(self):
         cameras = []
@@ -63,6 +64,23 @@ class CameraManager:
         if self.cap:
             self.cap.release()
 
+    def start_frame_thread(self):
+        self.is_reading = True
+        self.frame_thread = Thread(target=self.update_frame, daemon=True)
+        self.frame_thread.start()
+
+    def stop_frame_thread(self):
+        self.is_reading = False
+        if self.frame_thread is not None:
+            self.frame_thread.join()
+        self.frame_thread = None
+
+    def update_frame(self):
+        while self.is_reading:
+            ret, frame = self.cap.read()
+            if ret:
+                self.latest_frame = frame
+                
     def start_recording(self, filename):
 
         fourcc = cv2.VideoWriter_fourcc(*'H264')

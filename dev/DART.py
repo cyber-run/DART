@@ -1,6 +1,7 @@
 import logging
 logging.basicConfig(level=logging.ERROR)
 
+import cProfile, time, cv2, os
 from dyna_controller import DynaController
 from camera_manager import CameraManager
 from image_processor import ImageProcessor
@@ -15,10 +16,6 @@ from mocap_stream import *
 import vec_math2 as vm2
 import tkinter as tk
 import numpy as np
-import cProfile
-import time
-import cv2
-import os
 
 
 class DART:
@@ -177,7 +174,7 @@ class DART:
         self.file_button.pack(side="left", padx=10)
 
         # Button to start/stop saving images
-        self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", command=self.toggle_image_saving)
+        self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", command=self.toggle_record)
         self.record_button.pack(side="left", padx=10)
 
         # FPS indicator display
@@ -270,11 +267,13 @@ class DART:
         self.is_live = not self.is_live
         self.toggle_video_button.configure(text="Stop" if self.is_live else "Start")
         self.toggle_video_button.configure(image=self.stop_icon if self.is_live else self.play_icon)
-        self.update_fps_label()
         if self.is_live:
+            self.camera_manager.start_frame_thread()
             self.update_video_label()
+        else:
+            self.camera_manager.stop_frame_thread()
 
-    def toggle_image_saving(self):
+    def toggle_record(self):
         self.camera_manager.release()
         self.is_saving_images = not self.is_saving_images
         self.record_button.configure(text="Stop" if self.is_saving_images else "Record")
@@ -306,17 +305,11 @@ class DART:
 
     def update_video_label(self):
         if self.is_live:
-            ret, frame = self.camera_manager.cap.read()
-            if ret:
-                # Flip the frame horizontally
-                frame = cv2.flip(frame, 1)
-                
-                # Process the frame with all the selected options
+            frame = self.camera_manager.latest_frame
+
+            if frame is not None:
                 processed_frame = self.image_pro.process_frame(frame)
                 self.display_frame(processed_frame)
-                
-                # Save the original or processed frame if needed
-                self.save_frame(processed_frame)
 
             self.window.after(30, self.update_video_label)
 
@@ -332,12 +325,6 @@ class DART:
 
         # Update label with new image
         self.video_label.configure(image=img)
-
-    def save_frame(self, frame):
-        if self.is_saving_images:
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            filename = os.path.join(self.image_folder, f"image_{timestamp}.png")
-            cv2.imwrite(filename, frame)
 
     def set_threshold(self, value: float):
         self.image_pro.threshold_value = int(value)
