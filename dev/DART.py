@@ -53,8 +53,7 @@ class DART:
     def init_params(self):
         # Camera/image functionality
         self.is_live = False
-        self.is_saving_images = False
-        self.image_folder = "images"
+        self.video_folder = "dev/videos"
 
         # Image processing GUI flags
         self.show_crosshair = tk.BooleanVar(value=False)
@@ -274,9 +273,25 @@ class DART:
             self.camera_manager.stop_frame_thread()
 
     def toggle_record(self):
-        self.camera_manager.release()
-        self.is_saving_images = not self.is_saving_images
-        self.record_button.configure(text="Stop" if self.is_saving_images else "Record")
+        if not self.camera_manager.recording:
+            # Start recording
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            filename = os.path.join(self.video_folder, f"video_{timestamp}.mkv")
+
+            # Stop the frame thread if it's running
+            if self.camera_manager.is_reading:
+                self.camera_manager.stop_frame_thread()
+
+            self.camera_manager.start_recording(filename)
+            self.record_button.configure(text="Stop")
+        else:
+            # Stop recording
+            self.camera_manager.stop_recording()
+            self.record_button.configure(text="Record")
+
+            # Restart the frame thread if video feed is live
+            if self.is_live:
+                self.camera_manager.start_frame_thread()
 
     def adjust_gain(self, gain_value: float):
         if self.camera_manager.cap:

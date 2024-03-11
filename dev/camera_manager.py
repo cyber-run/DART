@@ -12,14 +12,13 @@ class CameraManager:
         self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.frame_size = (self.frame_width, self.frame_height)
-        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS),2)
+        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
 
         # Initialize video recording params
         self.frame_queue = Queue()
         self.recording = False
         self.writer = None
         self.writing_thread = None
-
 
         self.latest_frame = None
         self.frame_thread = None
@@ -82,7 +81,6 @@ class CameraManager:
                 self.latest_frame = frame
                 
     def start_recording(self, filename):
-
         fourcc = cv2.VideoWriter_fourcc(*'H264')
 
         self.writer = cv2.VideoWriter(filename, fourcc, self.fps, self.frame_size, isColor=False)
@@ -92,7 +90,7 @@ class CameraManager:
         else:
             logging.error("Failed to open video writer. Check codec and file path.")
             return  # Stop the recording process if writer fails to initialize
-        
+
         self.recording = True
 
         Thread(target=self.queue_frames, daemon=True).start()
@@ -100,7 +98,6 @@ class CameraManager:
         self.writing_thread.start()
 
     def queue_frames(self):
-
         while self.recording:
             logging.info("Capturing frame.")
             ret, frame = self.cap.read()
@@ -109,12 +106,11 @@ class CameraManager:
                 self.latest_frame = frame
                 self.frame_queue.put(self.latest_frame)
                 logging.info("Queueing frame.")
-        
-        # Signal the end of the frame queue via sentienel value
+
+        # Signal the end of the frame queue via sentinel value
         self.frame_queue.put(None)
 
     def write_frames(self):
-
         while True:
             frame = self.frame_queue.get()
 
