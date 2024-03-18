@@ -30,8 +30,21 @@
 
 - [x] Refactor code to be more modular and readable and create dev branch
 
+- [x] Add cd and user 
+
+- [x] tilt calibration
+    - [x] ammend calibrator class for additional point collection
+    - [x] add tilt centre to tracking calculation
+    - [ ] possibly change UI/UX for procedure
+
+- [x] add video compression -> VidGear
+
 - [ ] take the mean of multiple markers
 
-- [ ] tilt calibration
+- [x]  sync recording camera
 
-- [ ] Add cd and user 
+- [ ] ~add thread for position recording on dyna_controller~
+
+- [ ] Log event in mocap
+
+- thursday 

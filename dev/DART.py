@@ -1,22 +1,21 @@
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
-import cProfile, time, cv2, os
+import cProfile, time, cv2, os, asyncio
 from dyna_controller import DynaController
 from camera_manager import CameraManager
 from image_processor import ImageProcessor
-from calibrate import Calibrator
-from dart_track import dart_track
 from CTkMessagebox import CTkMessagebox
 from multiprocessing import Process
+from dart_track import dart_track
+from calibrate import Calibrator
 import serial.tools.list_ports
-from PIL import Image, ImageTk
 import customtkinter as ctk
-from mocap_stream import *
-import vec_math2 as vm2
+from PIL import Image
+from qtm_mocap import *
+from misc_funcs import num_to_range
 import tkinter as tk
 import numpy as np
-
 
 
 class DART:
@@ -33,6 +32,9 @@ class DART:
     def init_window(self, window):
         self.window = window
         self.window.title("DART")
+
+        # Set the minimum window size to the initial size
+        self.window.minsize(1300, 1000)
 
     def init_hardware(self):
         # Create an instance of ImageProcessor
@@ -61,13 +63,15 @@ class DART:
         self.threshold_flag = tk.BooleanVar(value=False)
         self.detect_flag = tk.BooleanVar(value=False)
 
-        # GUI icons
+        # GUI icons/assets
         self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png").resize((96, 96)))
         self.sync_icon = ctk.CTkImage(Image.open("dev/icons/sync.png").resize((96, 96)))
         self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png").resize((96, 96)))
         self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png").resize((96, 96)))
         self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png").resize((96, 96)))
         self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png").resize((96, 96)))
+        self.target_icon = ctk.CTkImage(Image.open("dev/icons/target.png").resize((96, 96)))
+        self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1008, 756), "black"), size=(1008, 756))
 
         # Motor control values
         self.pan_value = 0
@@ -79,16 +83,20 @@ class DART:
     def setup_gui_elements(self):
         self.video_label = ctk.CTkLabel(self.window, text="")
         self.video_label.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.video_label.configure(image=self.placeholder_image)
+        self.window.grid_rowconfigure(0, weight=1)  # Allow vertical expansion
+        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
 
         ################## Frame for motor controls ##################
-        dyn_control_frame = ctk.CTkFrame(self.window)
-        dyn_control_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)  # Increase vertical padding
+        dyna_control_frame = ctk.CTkFrame(self.window)
+        dyna_control_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        self.window.grid_rowconfigure(0, weight=1)  # Allow vertical expansion
 
         # Get available serial ports for combo box
         serial_ports = get_serial_ports()
 
         # Serial port frame
-        serial_frame = ctk.CTkFrame(dyn_control_frame)
+        serial_frame = ctk.CTkFrame(dyna_control_frame)
         serial_frame.pack(side="top", padx=10, pady=10)
 
         # Combo box for selecting the COM port
@@ -103,7 +111,7 @@ class DART:
         self.serial_refresh.pack(side="left", padx=5, pady=5)
 
         # Frame for pan slider and label
-        pan_frame = ctk.CTkFrame(dyn_control_frame)
+        pan_frame = ctk.CTkFrame(dyna_control_frame)
         pan_frame.pack(side="top", padx=10, pady=10)
         self.pan_slider = ctk.CTkSlider(pan_frame, from_=-45, to=45, command=self.set_pan)
         self.pan_slider.set(self.pan_value)
@@ -112,7 +120,7 @@ class DART:
         self.pan_label.pack()
 
         # Frame for tilt slider and label
-        tilt_frame = ctk.CTkFrame(dyn_control_frame)
+        tilt_frame = ctk.CTkFrame(dyna_control_frame)
         tilt_frame.pack(side="top", padx=10, pady=10)
         self.tilt_slider = ctk.CTkSlider(tilt_frame, from_=-45, to=45, command=self.set_tilt)
         self.tilt_slider.set(self.tilt_value)
@@ -121,16 +129,25 @@ class DART:
         self.tilt_label.pack()
 
         # Create a calibration button
-        self.calibration_button = ctk.CTkButton(dyn_control_frame, text="Calibrate", command=self.calibrate)
+        self.calibration_button = ctk.CTkButton(dyna_control_frame, text="Calibrate", command=self.calibrate)
         self.calibration_button.pack(side="top", padx=10, pady=10)
 
+        # Track frame
+        self.track_frame = ctk.CTkFrame(dyna_control_frame)
+        self.track_frame.pack(side="top", padx=10, pady=10)
+
         # Create a track button
-        self.track_button = ctk.CTkButton(dyn_control_frame, text="Track", command=self.track)
-        self.track_button.pack(side="top", padx=10, pady=10)
+        self.track_button = ctk.CTkButton(self.track_frame, width = 80, text="Track", command=self.track)
+        self.track_button.pack(side="left", padx=10, pady=10)
+
+        self.centre_button = ctk.CTkButton(self.track_frame, width = 40, text="", image=self.target_icon, 
+                                           command=self.centre)
+        self.centre_button.pack(side="left", padx=10, pady=10)
 
         ################## Frame for camera controls ##################
         camera_control_frame = ctk.CTkFrame(self.window)
-        camera_control_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)  # Increase vertical padding
+        camera_control_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
 
         # Camera combo box frame
         cam_frame = ctk.CTkFrame(camera_control_frame)
@@ -165,7 +182,7 @@ class DART:
         gain_frame = ctk.CTkFrame(camera_control_frame)
         gain_frame.pack(side="left", padx=10, pady=10)
         self.gain_slider = ctk.CTkSlider(gain_frame, width =140, from_=0, to=47, command=self.adjust_gain)
-        self.gain_slider.set(25) 
+        self.gain_slider.set(10) 
         self.gain_slider.pack(padx=5, pady=5)
         self.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 10")
         self.gain_label.pack()
@@ -194,11 +211,12 @@ class DART:
 
         ################## Frame for image processing detect ##################
         img_processing_frame = ctk.CTkFrame(self.window)
-        img_processing_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)  # Increase vertical padding
+        img_processing_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
 
         # Button to start/stop saving images
         self.mocap_button = ctk.CTkButton(img_processing_frame, width=80, text="MoCap", image=self.sync_icon, 
-                                          command=self.connect_mocap)
+                                          command=self.mocap_button_press)
         self.mocap_button.pack(side="left", padx=10)
 
         self.crosshair_checkbox = ctk.CTkCheckBox(
@@ -294,9 +312,9 @@ class DART:
             timestamp = time.strftime("%Y%m%dT%H%M%S")
             file_name = self.file_name_entry.get().strip()  # Get the file name from the entry field
             if file_name:
-                file_name = f"{file_name}_{timestamp}.mkv"
+                file_name = f"{file_name}_{timestamp}.mp4"
             else:
-                file_name = f"video_{timestamp}.mkv"
+                file_name = f"video_{timestamp}.mp4"
             filename = os.path.join(self.video_path, file_name)
             
             # Stop the frame thread if it's running
@@ -426,11 +444,16 @@ class DART:
         else:
             logging.error("No camera selected.")
 
+    def mocap_button_press(self):
+        self.connect_mocap()
+        self.update_num_marker_label()
+
     def connect_mocap(self):
         try:
-            self.target = MoCap(stream_type='3d')
+            self.target = QTMStream()
             self.target.calibration_target = True
-            self.update_num_marker_label()
+
+            self.qtm_control = QTMControl()
             logging.info("Connected to QTM.")
         except Exception as e:
             logging.error(f"Error connecting to QTM: {e}")
@@ -441,7 +464,7 @@ class DART:
             value = round(value, 3)
             self.pan_value = value
             self.pan_label.configure(text=f"Pan angle: {value}")
-            angle = vm2.num_to_range(self.pan_value, -45, 45, 202.5, 247.5)
+            angle = num_to_range(self.pan_value, -45, 45, 202.5, 247.5)
             self.dyna.set_pos(1, angle)
         else:
             logging.error("Dynamixel controller not connected.")
@@ -451,30 +474,36 @@ class DART:
             value = round(value, 3)
             self.tilt_value = value
             self.tilt_label.configure(text=f"Tilt angle: {value}")
-            angle = vm2.num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
+            angle = num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
             self.dyna.set_pos(2, angle)
         else:
             logging.error("Dynamixel controller not connected.")
+
+    def centre(self):
+        self.set_pan(0)
+        self.set_tilt(0)
+        self.pan_slider.set(0)
+        self.tilt_slider.set(0)
 
     def on_closing(self):
         try:
             self.target._close()
             self.target.close()
         except Exception as e:
-            logging.error(f"Error closing QTM connection: {e}")
+            logging.info(f"Error closing QTM connection: {e}")
             
         try:
             # Close the camera
             self.is_live = False
             self.camera_manager.release()
         except Exception as e:
-            logging.error(f"Error closing camera or serial port: {e}")
+            logging.info(f"Error closing camera or serial port: {e}")
 
         try:
             # Close the serial port
             self.dyna.close_port()
         except Exception as e:
-            logging.error(f"Error closing serial port: {e}")
+            logging.info(f"Error closing serial port: {e}")
 
         # Terminate subprocess
         if self.track_process is not None and hasattr(self, 'track_process') and self.track_process.is_alive():

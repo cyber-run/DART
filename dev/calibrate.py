@@ -1,20 +1,13 @@
-import os
-import pickle
-import logging
-import math
-import numpy as np
+import os, pickle, logging, math
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from typing import Tuple
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+import numpy as np
 
 class Calibrator:
     def __init__(self):
         self.positions = []
         self.rotation_matrix = None
-        self.local_origin = None
+        self.pan_origin = None
         self.calibration_step = 0
         self.calibrated = False
 
@@ -22,10 +15,10 @@ class Calibrator:
         calib_data_path = 'dev/config/calib_data.pkl'
         if os.path.exists(calib_data_path):
             with open(calib_data_path, 'rb') as f:
-                self.local_origin, self.rotation_matrix = pickle.load(f)
+                self.pan_origin, self.tilt_origin, self.rotation_matrix = pickle.load(f)
                 self.calibrated = True
                 logging.info("Calibration data loaded successfully.")
-                print(f"Local origin: {self.local_origin}")
+                print(f"Local origin: {self.pan_origin}")
         else:
             logging.info("No calibration data found.")
 
@@ -37,22 +30,25 @@ class Calibrator:
 
         self.calibration_step = 1
 
-        if len(self.positions) < 4:
+        if len(self.positions) < 6:
             logging.info("More points needed for calibration.")
             return
         else:
-            self.calibrate(*self.positions[:4])
+            self.calibrate(*self.positions[:6])
             self.positions = []  # Reset positions after calibration
             self.calibrated = True
             self.calibration_step = 0
             logging.info("Calibration completed.")
 
-    def calibrate(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray):
+    def calibrate(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray, p5: np.ndarray, p6: np.ndarray):
         x1, x2 = self.find_closest_points(p1, p2, p3, p4)
-        self.local_origin = self.calculate_midpoint(x1, x2)
+        self.pan_origin = self.calculate_midpoint(x1, x2)
 
-        vec1 = (p1 + p2) / 2 - self.local_origin
-        vec2 = (p3 + p4) / 2 - self.local_origin
+        x3, x4 = self.find_closest_points(p1, p2, p5, p6)
+        self.tilt_origin = self.calculate_midpoint(x3, x4)
+
+        vec1 = (p1 + p2) / 2 - self.pan_origin
+        vec2 = (p3 + p4) / 2 - self.pan_origin
 
         vec1_normalized = vec1 / np.linalg.norm(vec1)
         vec2_normalized = vec2 / np.linalg.norm(vec2)
@@ -67,7 +63,7 @@ class Calibrator:
 
         os.makedirs('config', exist_ok=True)  # Ensure the config directory exists
         with open('dev/config/calib_data.pkl', 'wb') as f:
-            pickle.dump((self.local_origin, self.rotation_matrix), f)
+            pickle.dump((self.pan_origin, self.tilt_origin, self.rotation_matrix), f)
             logging.info("Calibration data saved successfully.")
 
     def find_closest_points(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -94,7 +90,7 @@ class Calibrator:
     def global_to_local(self, point_global: np.ndarray) -> np.ndarray:
         if self.rotation_matrix is None:
             raise ValueError("Calibration must be completed before transforming points.")
-        return np.dot(np.linalg.inv(self.rotation_matrix), point_global - self.local_origin)
+        return np.dot(np.linalg.inv(self.rotation_matrix), point_global - self.pan_origin)
 
     def calc_rot_comp(self, point_local: np.ndarray) -> Tuple[float, float]:
         pan_angle = math.degrees(math.atan2(point_local[1], point_local[0]))
@@ -113,7 +109,7 @@ class Calibrator:
             logging.info("Rotation matrix not set.")
 
     def plot_calibration(self, p1, p2, p3, p4):
-        if self.rotation_matrix is None or self.local_origin is None:
+        if self.rotation_matrix is None or self.pan_origin is None:
             logging.error("Calibration data not available.")
             return
 
@@ -123,8 +119,8 @@ class Calibrator:
         # Plot axes of the rotation matrix from the intersection point
         axis_length = 1.0  # Adjust for better visualization
         for i, axis in enumerate(['X', 'Y', 'Z']):
-            end_point = self.local_origin + axis_length * self.rotation_matrix[:, i]
-            ax.quiver(*self.local_origin, *(self.rotation_matrix[:, i]), length=axis_length, label=f'{axis}-axis')
+            end_point = self.pan_origin + axis_length * self.rotation_matrix[:, i]
+            ax.quiver(*self.pan_origin, *(self.rotation_matrix[:, i]), length=axis_length, label=f'{axis}-axis')
 
         ax.set_xlabel('X')
         ax.set_ylabel('Y')

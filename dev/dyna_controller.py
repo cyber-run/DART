@@ -1,11 +1,8 @@
-from dynamixel_sdk import *  # Uses Dynamixel SDK library
-from mocap_stream import set_realtime_priority
+import threading, time, math, logging, cProfile
+from misc_funcs import set_realtime_priority
 from typing import Dict, Tuple
+from dynamixel_sdk import *
 import numpy as np
-import cProfile
-import logging
-import math
-import time
 
 
 class DynaController:
@@ -35,6 +32,9 @@ class DynaController:
         # COM and U2D2 params
         self.baud = baud_rate
         self.com = com_port
+
+        self.read_positions_flag = True
+        self.lock = threading.Lock()
 
         self.port_handler = PortHandler(self.com)
         self.packet_handler = PacketHandler(self.PROTOCOL_VERSION)
@@ -447,12 +447,34 @@ class DynaController:
         n = n & 0xffffffff
         return (n ^ 0x80000000) - 0x80000000
 
-    def calibrate_position(self):
+    def start_position_reading(self, interval=0.5):
+        self.read_positions_thread = threading.Thread(target=self._read_positions, args=(interval,))
+        self.read_positions_thread.start()
 
-        self.set_pos(180)
+    def stop_position_reading(self):
+        with self.lock:
+            self.read_positions_flag = False
+        self.read_positions_thread.join()
 
-        print("Calibrating position:")
-        input("Manually align the servo and press Enter when ready.")
+    def _read_positions(self, interval):
+        pan_positions = []
+        tilt_positions = []
+        while self.read_positions_flag:
+            with self.lock:
+                pan_pos, tilt_pos = self.get_sync_pos()
+            pan_positions.append(pan_pos)
+            tilt_positions.append(tilt_pos)
+            time.sleep(interval)
+        self.save_positions(pan_positions, tilt_positions, "position_data.npz")
+
+    def save_positions(self, pan_positions, tilt_positions, filename):
+        pan_positions_array = np.array(pan_positions)
+        tilt_positions_array = np.array(tilt_positions)
+        np.savez(filename, pan_positions=pan_positions_array, tilt_positions=tilt_positions_array)
+
+    def set_sync_pos_with_lock(self, pan_pos: float = 180, tilt_pos: float = 180) -> None:
+        with self.lock:
+            self.set_sync_pos(pan_pos, tilt_pos)
 
     def close_port(self):
         self.port_handler.closePort()
@@ -589,14 +611,25 @@ def main():
     dyna = DynaController()
     dyna.open_port()
 
-    dyna.set_op_mode(dyna.pan_id, 16)
-    dyna.set_op_mode(dyna.tilt_id, 16)
+    dyna.set_op_mode(dyna.pan_id, 3)
+    dyna.set_op_mode(dyna.tilt_id, 3)
 
-    dyna.set_sync_pwm(0, 0)
-    time.sleep(2)
-    dyna.set_sync_pwm(-100.43, -100)
-    time.sleep(2)
-    dyna.set_sync_pwm(100, 100)
+    # Start position reading
+    dyna.start_position_reading()
+
+    # Oscillate the pan and tilt motors
+    start_time = time.perf_counter()
+    direction = 1
+    while time.perf_counter() - start_time < 10:
+        pan_pos = 225 + direction * 30 * math.sin(2 * math.pi * (time.perf_counter() - start_time))
+        tilt_pos = 315 + direction * 30 * math.sin(2 * math.pi * (time.perf_counter() - start_time))
+        dyna.set_sync_pos(pan_pos, tilt_pos)
+        time.sleep(0.01)
+
+    dyna.stop_position_reading()
+
+    # Stop position reading and save the data to a file
+    dyna.stop_position_reading()
 
 def main2():
     dyna = DynaController()
@@ -612,6 +645,6 @@ def main2():
     dyna.set_torque(dyna.tilt_id, False)
 
 if __name__ == "__main__":
-    # main()
+    main()
     # get_theta_bode()
-    get_curr_bode()
+    # get_curr_bode()

@@ -1,11 +1,9 @@
+from misc_funcs import set_realtime_priority
+import logging, pickle, time, os, cProfile
 from dyna_controller import *
 from importlib import reload
-from mocap_stream import *
+from qtm_mocap import *
 import numpy as np
-import cProfile
-import logging
-import pickle
-import time
 
 
 class DynaTracker:
@@ -21,14 +19,14 @@ class DynaTracker:
         # Load calibration data if it exists
         if os.path.exists('dev/config/calib_data.pkl'):
             with open('dev/config/calib_data.pkl', 'rb') as f:
-                self.local_origin, self.rotation_matrix = pickle.load(f)
+                self.pan_origin, self.tilt_origin, self.rotation_matrix = pickle.load(f)
                 logging.info("Calibration data loaded successfully.")
         else:
             logging.error("No calibration data found.")
             quit()
 
         # Connect to QTM; init tracker and target
-        self.target = MoCap(stream_type='3d')
+        self.target = QTMStream()
         time.sleep(0.1)
 
         # Create dynamixel controller object and open serial port
@@ -39,10 +37,15 @@ class DynaTracker:
         self.dyna.set_op_mode(self.dyna.pan_id, 3)
         self.dyna.set_op_mode(self.dyna.tilt_id, 3)
 
-    def global_to_local(self, point_global: np.ndarray) -> np.ndarray:
+    def tilt_global_to_local(self, point_global: np.ndarray) -> np.ndarray:
         if self.rotation_matrix is None:
             raise ValueError("Calibration must be completed before transforming points.")
-        return np.dot(np.linalg.inv(self.rotation_matrix), point_global - self.local_origin)
+        return np.dot(np.linalg.inv(self.rotation_matrix), point_global - self.tilt_origin)
+    
+    def pan_global_to_local(self, point_global: np.ndarray) -> np.ndarray:
+        if self.rotation_matrix is None:
+            raise ValueError("Calibration must be completed before transforming points.")
+        return np.dot(np.linalg.inv(self.rotation_matrix), point_global - self.pan_origin)
 
     def calc_rot_comp(self, point_local: np.ndarray) -> Tuple[float, float]:
         pan_angle = math.degrees(math.atan2(point_local[1], point_local[0]))
@@ -63,10 +66,12 @@ class DynaTracker:
         target_pos = self.target.position
 
         # Get the local target position
-        local_target_pos = self.global_to_local(target_pos)
+        pan_local_target_pos = self.pan_global_to_local(target_pos)
+        tilt_local_target_pos = self.tilt_global_to_local(target_pos)
 
         # Calculate the pan and tilt components of rotation from the positive X-axis
-        pan_angle, tilt_angle = self.calc_rot_comp(local_target_pos)
+        pan_angle, _ = self.calc_rot_comp(pan_local_target_pos)
+        _, tilt_angle = self.calc_rot_comp(tilt_local_target_pos)
 
         # Convert geometric angles to dynamixel angles
         pan_angle = self.num_to_range(pan_angle, 45, -45, 202.5, 247.5)

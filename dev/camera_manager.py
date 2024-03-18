@@ -1,4 +1,5 @@
-import os, time, cv2, logging, EasyPySpin
+import time, cv2, logging, EasyPySpin
+from vidgear.gears import WriteGear
 from threading import Thread
 from queue import Queue
 
@@ -6,13 +7,6 @@ from queue import Queue
 class CameraManager:
     def __init__(self):
         self.cap = None
-        self.initialize_camera()
-
-        # Get camera properties
-        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.frame_size = (self.frame_width, self.frame_height)
-        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
 
         # Initialize video recording params
         self.frame_queue = Queue()
@@ -23,6 +17,8 @@ class CameraManager:
         self.latest_frame = None
         self.frame_thread = None
         self.is_reading = False
+        self.start_t = None
+        self.frame_counter = 0
     
     def get_available_cameras(self):
         cameras = []
@@ -56,8 +52,16 @@ class CameraManager:
             self.release()
 
     def configure_camera(self):
-        self.cap.set_pyspin_value('AcquisitionFrameRateEnable', True)
-        self.cap.set_pyspin_value('AcquisitionFrameRate', 220)
+        self.cap.set_pyspin_value('AcquisitionFrameRateEnable', False)
+        self.cap.set_pyspin_value('AcquisitionFrameRate', 201)
+
+        # Get camera properties
+        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.frame_size = (self.frame_width, self.frame_height)
+        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
+
+        
 
     def release(self):
         if self.cap:
@@ -67,29 +71,38 @@ class CameraManager:
         self.is_reading = True
         self.frame_thread = Thread(target=self.update_frame, daemon=True)
         self.frame_thread.start()
+        self.start_t = time.perf_counter()
 
     def stop_frame_thread(self):
         self.is_reading = False
         if self.frame_thread is not None:
             self.frame_thread.join()
         self.frame_thread = None
+        print(f"Frames processed: {self.frame_counter} in {time.perf_counter() - self.start_t:.4f} s")
+        print(f"Frame rate: {self.frame_counter/(time.perf_counter() - self.start_t):.4f} fps")
+        self.frame_counter = 0
 
     def update_frame(self):
         while self.is_reading:
             ret, frame = self.cap.read()
             if ret:
+                self.frame_counter += 1
                 self.latest_frame = frame
                 
     def start_recording(self, filename):
-        fourcc = cv2.VideoWriter_fourcc(*'H264')
+        # cv2 writer parameters
+        # fourcc = cv2.VideoWriter_fourcc(*'H264')
+        # self.writer = cv2.VideoWriter(filename, fourcc, self.fps, self.frame_size, isColor=False)
 
-        self.writer = cv2.VideoWriter(filename, fourcc, self.fps, self.frame_size, isColor=False)
-
-        if self.writer.isOpened():
-            self.writer.set(cv2.VIDEOWRITER_PROP_QUALITY, 50)  # Adjust quality (0-100)
-        else:
-            logging.error("Failed to open video writer. Check codec and file path.")
-            return  # Stop the recording process if writer fails to initialize
+        # Vidgear wrtier parameters
+        output_params = {
+            "-input_framerate": self.fps,
+            "-r" : self.fps,
+            "-preset": "ultrafast",
+            "-crf": 23
+        }
+        # Define writer with defined parameters and suitable output filename for e.g. `Output.mp4
+        self.writer = WriteGear(output=filename, logging=True, **output_params)
 
         self.recording = True
 
@@ -116,11 +129,13 @@ class CameraManager:
                 frame = self.frame_queue.get()
                 if frame is not None and frame.size != 0:
                     logging.info("Writing frame...")
+                    # Convert ndarray to cv2.imshow compatible format
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                     self.writer.write(frame)
             else:
                 time.sleep(0.001)  # Add a small delay to avoid excessive CPU usage
 
-        self.writer.release()
+        self.writer.close()
         
         # Execute the callback function if provided
         if self.on_write_finished:
