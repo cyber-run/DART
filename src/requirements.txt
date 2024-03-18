@@ -20,5 +20,5 @@ python-dateutil==2.9.0.post0
 qtm==2.1.2
 scipy==1.10.1
 six==1.16.0
-spinnaker-python @ file:///src/spinnaker_python-3.1.0.79-cp38-cp38-macosx_10_14_x86_64.whl#sha256=00ab9b8bee52c3fd8a4535ff3c2c97282c31c6ab84bae5df9272cf678d3f5b55
+# spinnaker-python @ file:///src/spinnaker_python-3.1.0.79-cp38-cp38-macosx_10_14_x86_64.whl#sha256=00ab9b8bee52c3fd8a4535ff3c2c97282c31c6ab84bae5df9272cf678d3f5b55
 zipp==3.17.0
