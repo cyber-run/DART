@@ -72,6 +72,7 @@ class DART:
         self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png").resize((96, 96)))
         self.target_icon = ctk.CTkImage(Image.open("dev/icons/target.png").resize((96, 96)))
         self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1008, 756), "black"), size=(1008, 756))
+        self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1008, 756), "black"), size=(1008, 756))
 
         # Motor control values
         self.pan_value = 0
@@ -151,33 +152,33 @@ class DART:
 
         # Camera combo box frame
         cam_frame = ctk.CTkFrame(camera_control_frame)
-        cam_frame.pack(side="left", padx=10, pady = 10)
+        cam_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
 
-        # Dropdown comobo box for selecting the camera
+        # Dropdown combo box for selecting the camera
         self.cam_combobox = ctk.CTkComboBox(cam_frame, width=100, values=[],
-                                                variable=self.selected_camera,
-                                                command=self.connect_camera)
+                                            variable=self.selected_camera,
+                                            command=self.connect_camera)
         self.cam_combobox.pack(side="left", padx=5, pady=5)
 
         # Button to refresh camera list
-        self.cam_refresh = ctk.CTkButton(cam_frame, width=28, text="", image=self.refresh_icon, 
-                                         command=self.update_camera_dropdown)
+        self.cam_refresh = ctk.CTkButton(cam_frame, width=28, text="", image=self.refresh_icon,
+                                        command=self.update_camera_dropdown)
         self.cam_refresh.pack(side="left", padx=5, pady=5)
 
         # Button to start/stop live feed
-        self.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", image=self.play_icon, 
-                                                 command=self.toggle_video_feed)
-        self.toggle_video_button.pack(side="left", padx=10)
+        self.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", image=self.play_icon,
+                                                command=self.toggle_video_feed)
+        self.toggle_video_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # Frame for exposure slider and label
         exposure_frame = ctk.CTkFrame(camera_control_frame)
-        exposure_frame.pack(side="left", padx=10, pady = 10)
-        self.exposure_slider = ctk.CTkSlider(exposure_frame, width =140, from_=4, to=4000, command=self.adjust_exposure)
+        exposure_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
+        self.exposure_slider = ctk.CTkSlider(exposure_frame, width=140, from_=4, to=4000, command=self.adjust_exposure)
         self.exposure_slider.set(1000)
-        self.exposure_slider.pack(padx =5, pady=5)
+        self.exposure_slider.pack(padx=5, pady=5)
         self.exposure_label = ctk.CTkLabel(exposure_frame, text="Exposure (us): 1000")
         self.exposure_label.pack()
- 
+
         # Frame for gain slider and label
         gain_frame = ctk.CTkFrame(camera_control_frame)
         gain_frame.pack(side="left", padx=10, pady=10)
@@ -189,7 +190,7 @@ class DART:
 
         # Frame for video path and file name
         video_path_frame = ctk.CTkFrame(camera_control_frame)
-        video_path_frame.pack(side="left", padx=10, pady=10)
+        video_path_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
 
         # Button to open folder dialog
         self.file_button = ctk.CTkButton(video_path_frame, width=28, text="", image=self.folder_icon, command=self.select_folder)
@@ -201,16 +202,18 @@ class DART:
 
         # Button to start/stop saving images
         self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", image=self.record_icon, command=self.toggle_record)
-        self.record_button.pack(side="left", padx=10)
+        self.record_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # FPS indicator display
         fps_frame = ctk.CTkFrame(camera_control_frame)
-        fps_frame.pack(side="right", padx=10, pady=10)
+        fps_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
         self.fps_label = ctk.CTkLabel(fps_frame, text="FPS: 220.00")
         self.fps_label.pack(padx=5, pady=5)
 
         ################## Frame for image processing detect ##################
         img_processing_frame = ctk.CTkFrame(self.window)
+        img_processing_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
         img_processing_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
         self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
 
@@ -219,6 +222,7 @@ class DART:
                                           command=self.mocap_button_press)
         self.mocap_button.pack(side="left", padx=10)
 
+        # Checkbox to enable/disable crosshair used to help with calibration
         self.crosshair_checkbox = ctk.CTkCheckBox(
             img_processing_frame,
             text="Crosshair",
@@ -227,8 +231,9 @@ class DART:
             onvalue=True,
             offvalue=False
         )
-        self.crosshair_checkbox.pack(side="left", padx=10)
+        self.crosshair_checkbox.pack(side="left", padx=10, anchor="center", expand=True)
 
+        # Checkbox to enable/disable circle detection algorithm
         self.detect_checkbox = ctk.CTkCheckBox(
             img_processing_frame,
             text="Detect",
@@ -237,31 +242,40 @@ class DART:
             onvalue=True,
             offvalue=False
         )
-        self.detect_checkbox.pack(side="left", padx=10)
+        self.detect_checkbox.pack(side="left", padx=10, anchor="center", expand=True)
 
-        # Frame for threshold slider and label
+        # Frame for threshold slider and label for binary mask -> used in Hough transform
         threshold_frame = ctk.CTkFrame(img_processing_frame)
-        threshold_frame.pack(side="left", padx=10, pady=10)
-        self.threshold_slider = ctk.CTkSlider(threshold_frame, width =140, from_=0, to=255, command=self.set_threshold)
+        threshold_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
+        self.threshold_slider = ctk.CTkSlider(threshold_frame, width=140, from_=0, to=255, command=self.set_threshold)
         self.threshold_slider.set(70)
-        self.threshold_slider.pack(padx =5, pady=5)
+        self.threshold_slider.pack(padx=5, pady=5)
         self.threshold_label = ctk.CTkLabel(threshold_frame, text="Threshold: 70")
         self.threshold_label.pack()
 
-        # Frame for strength slider and label
+        # Frame for strength slider and label for Hough circle detection
         strength_frame = ctk.CTkFrame(img_processing_frame)
-        strength_frame.pack(side="left", padx=10, pady=10)
-        self.strength_slider = ctk.CTkSlider(strength_frame, width =140, from_=30, to=100, command=self.set_strength)
+        strength_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
+        self.strength_slider = ctk.CTkSlider(strength_frame, width=140, from_=30, to=100, command=self.set_strength)
         self.strength_slider.set(60)
-        self.strength_slider.pack(padx =5, pady=5)
+        self.strength_slider.pack(padx=5, pady=5)
         self.strength_label = ctk.CTkLabel(strength_frame, text="Strength: 60")
         self.strength_label.pack()
 
-        # FPS indicator display
+        # MoCap number of markers indicator
         num_marker_frame = ctk.CTkFrame(img_processing_frame)
-        num_marker_frame.pack(side="right", padx=10, pady=10)
+        num_marker_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
         self.num_marker_label = ctk.CTkLabel(num_marker_frame, text="No. Markers: 0")
         self.num_marker_label.pack(padx=5, pady=5)
+
+        # Add status bar to bottom of window
+        self.status_bar = ctk.CTkFrame(self.window, height=5, corner_radius=0)
+        self.status_bar.grid(row=3, column=0, columnspan=2, sticky="nsew")
+
+        # Add label to status bar
+        self.status_label = ctk.CTkLabel(self.status_bar, text="Ready", font=("", 12))
+        self.status_label.pack(side="left", padx=10)
+
 
     def calibrate(self):
         p1 = np.array(self.target.position)
