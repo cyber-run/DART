@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 import cProfile, time, cv2, os, asyncio
 from dyna_controller import DynaController
@@ -172,19 +172,19 @@ class DART:
 
         # Frame for exposure slider and label
         exposure_frame = ctk.CTkFrame(camera_control_frame)
-        exposure_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
+        exposure_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
         self.exposure_slider = ctk.CTkSlider(exposure_frame, width=140, from_=4, to=4000, command=self.adjust_exposure)
         self.exposure_slider.set(1000)
-        self.exposure_slider.pack(padx=5, pady=5)
+        self.exposure_slider.pack(padx=5, pady=5, expand=True, fill="x")
         self.exposure_label = ctk.CTkLabel(exposure_frame, text="Exposure (us): 1000")
         self.exposure_label.pack()
 
         # Frame for gain slider and label
         gain_frame = ctk.CTkFrame(camera_control_frame)
-        gain_frame.pack(side="left", padx=10, pady=10)
+        gain_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
         self.gain_slider = ctk.CTkSlider(gain_frame, width =140, from_=0, to=47, command=self.adjust_gain)
         self.gain_slider.set(10) 
-        self.gain_slider.pack(padx=5, pady=5)
+        self.gain_slider.pack(padx=5, pady=5, expand=True, fill="x")
         self.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 10")
         self.gain_label.pack()
 
@@ -401,7 +401,7 @@ class DART:
         img = Image.fromarray(img)
 
         # Convert to tk img
-        img = ctk.CTkImage(img, size = (1008, 756))
+        img = ctk.CTkImage(img, size = (self.camera_manager.frame_width, self.camera_manager.frame_height))
 
         # Update label with new image
         self.video_label.configure(image=img)

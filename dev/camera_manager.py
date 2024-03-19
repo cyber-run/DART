@@ -1,4 +1,4 @@
-import time, cv2, logging, EasyPySpin
+import os, time, cv2, logging, EasyPySpin
 from vidgear.gears import WriteGear
 from threading import Thread
 from queue import Queue
@@ -7,6 +7,13 @@ from queue import Queue
 class CameraManager:
     def __init__(self):
         self.cap = None
+        self.initialize_camera()
+
+        # Get camera properties
+        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.frame_size = (self.frame_width, self.frame_height)
+        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
 
         # Initialize video recording params
         self.frame_queue = Queue()
@@ -52,16 +59,9 @@ class CameraManager:
             self.release()
 
     def configure_camera(self):
-        self.cap.set_pyspin_value('AcquisitionFrameRateEnable', False)
-        self.cap.set_pyspin_value('AcquisitionFrameRate', 201)
-
-        # Get camera properties
-        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.frame_size = (self.frame_width, self.frame_height)
-        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
-
-        
+        # self.cap.set_pyspin_value('AcquisitionFrameRateEnable', False)
+        # self.cap.set_pyspin_value('AcquisitionFrameRate', 201)
+        pass
 
     def release(self):
         if self.cap:
@@ -99,7 +99,7 @@ class CameraManager:
             "-input_framerate": self.fps,
             "-r" : self.fps,
             "-preset": "ultrafast",
-            "-crf": 23
+            "-crf": 21
         }
         # Define writer with defined parameters and suitable output filename for e.g. `Output.mp4
         self.writer = WriteGear(output=filename, logging=True, **output_params)

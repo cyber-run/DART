@@ -26,19 +26,19 @@ class Calibrator:
         self.positions.append(p1)
         self.positions.append(p2)
 
-        logging.info(f"Step: {self.calibration_step} ----> Positions recorded: {p1}, {p2}")
+        print(f"Step: {self.calibration_step} ----> Positions recorded: {p1}, {p2}")
 
         self.calibration_step = 1
 
         if len(self.positions) < 6:
-            logging.info("More points needed for calibration.")
+            print("More points needed for calibration.")
             return
         else:
             self.calibrate(*self.positions[:6])
             self.positions = []  # Reset positions after calibration
             self.calibrated = True
             self.calibration_step = 0
-            logging.info("Calibration completed.")
+            print("Calibration completed.")
 
     def calibrate(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray, p5: np.ndarray, p6: np.ndarray):
         x1, x2 = self.find_closest_points(p1, p2, p3, p4)
