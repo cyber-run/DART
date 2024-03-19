@@ -25,6 +25,7 @@ class CameraManager:
         self.frame_thread = None
         self.is_reading = False
         self.start_t = None
+        self.is_paused = False
         self.frame_counter = 0
     
     def get_available_cameras(self):
@@ -102,7 +103,7 @@ class CameraManager:
             "-crf": 21
         }
         # Define writer with defined parameters and suitable output filename for e.g. `Output.mp4
-        self.writer = WriteGear(output=filename, logging=True, **output_params)
+        self.writer = WriteGear(output=filename, logging=False, **output_params)
 
         self.recording = True
 

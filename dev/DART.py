@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
 import cProfile, time, cv2, os, asyncio
 from dyna_controller import DynaController
@@ -71,8 +71,10 @@ class DART:
         self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png").resize((96, 96)))
         self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png").resize((96, 96)))
         self.target_icon = ctk.CTkImage(Image.open("dev/icons/target.png").resize((96, 96)))
+        self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png").resize((96, 96)))
         self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1008, 756), "black"), size=(1008, 756))
-        self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1008, 756), "black"), size=(1008, 756))
+
+        self.app_status = "Idle"
 
         # Motor control values
         self.pan_value = 0
@@ -129,21 +131,21 @@ class DART:
         self.tilt_label = ctk.CTkLabel(tilt_frame, text="Tilt angle: 0")
         self.tilt_label.pack()
 
+        # Calibrate frame
+        self.calibrate_frame = ctk.CTkFrame(dyna_control_frame)
+        self.calibrate_frame.pack(side="top", padx=10, pady=10)
+
         # Create a calibration button
-        self.calibration_button = ctk.CTkButton(dyna_control_frame, text="Calibrate", command=self.calibrate)
-        self.calibration_button.pack(side="top", padx=10, pady=10)
+        self.calibration_button = ctk.CTkButton(self.calibrate_frame, width = 80, text="Calibrate", command=self.calibrate)
+        self.calibration_button.pack(side="left", padx=10, pady=10)
 
-        # Track frame
-        self.track_frame = ctk.CTkFrame(dyna_control_frame)
-        self.track_frame.pack(side="top", padx=10, pady=10)
-
-        # Create a track button
-        self.track_button = ctk.CTkButton(self.track_frame, width = 80, text="Track", command=self.track)
-        self.track_button.pack(side="left", padx=10, pady=10)
-
-        self.centre_button = ctk.CTkButton(self.track_frame, width = 40, text="", image=self.target_icon, 
+        self.centre_button = ctk.CTkButton(self.calibrate_frame, width = 40, text="", image=self.target_icon, 
                                            command=self.centre)
         self.centre_button.pack(side="left", padx=10, pady=10)
+
+        # Create a track button
+        self.track_button = ctk.CTkButton(dyna_control_frame, text="Track", command=self.track)
+        self.track_button.pack(side="top", padx=10, pady=10)
 
         ################## Frame for camera controls ##################
         camera_control_frame = ctk.CTkFrame(self.window)
@@ -200,14 +202,18 @@ class DART:
         self.file_name_entry = ctk.CTkEntry(video_path_frame, width=120, placeholder_text="Enter file name")
         self.file_name_entry.pack(side="left", padx=5, pady=5)
 
-        # Button to start/stop saving images
-        self.record_button = ctk.CTkButton(camera_control_frame, width=80, text="Record", image=self.record_icon, command=self.toggle_record)
+        # Button to start/stop recording
+        self.record_button = ctk.CTkButton(camera_control_frame, width=90, text="Record", image=self.record_icon, command=self.toggle_record)
         self.record_button.pack(side="left", padx=10, anchor="center", expand=True)
+
+        # Button to pause recording
+        self.pause_button = ctk.CTkButton(camera_control_frame, width=100, text="Pause", image=self.pause_icon, command=self.toggle_pause, state="disabled")
+        self.pause_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # FPS indicator display
         fps_frame = ctk.CTkFrame(camera_control_frame)
         fps_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
-        self.fps_label = ctk.CTkLabel(fps_frame, text="FPS: 220.00")
+        self.fps_label = ctk.CTkLabel(fps_frame, text=f"FPS: {round(self.camera_manager.fps, 2)}")
         self.fps_label.pack(padx=5, pady=5)
 
         ################## Frame for image processing detect ##################
@@ -269,13 +275,14 @@ class DART:
         self.num_marker_label.pack(padx=5, pady=5)
 
         # Add status bar to bottom of window
-        self.status_bar = ctk.CTkFrame(self.window, height=5, corner_radius=0)
-        self.status_bar.grid(row=3, column=0, columnspan=2, sticky="nsew")
+        self.status_bar = ctk.CTkFrame(self.window, height=5, corner_radius=0, border_width=-2)
+        self.status_bar.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(15,0))
 
         # Add label to status bar
-        self.status_label = ctk.CTkLabel(self.status_bar, text="Ready", font=("", 12))
-        self.status_label.pack(side="left", padx=10)
-
+        self.status_label = ctk.CTkLabel(self.status_bar, text=self.app_status, height=18)
+        self.status_label.pack(side="left", padx=10, pady=0, anchor="center")
+        self.age_label = ctk.CTkLabel(self.status_bar, text=f"Calibration age: {int(self.calibrator.calibration_age)} h", height=18)
+        self.age_label.pack(side="left", padx=10, pady=0, anchor="e", expand=True)
 
     def calibrate(self):
         p1 = np.array(self.target.position)
@@ -323,6 +330,7 @@ class DART:
     def toggle_record(self):
         if not self.camera_manager.recording:
             # Start recording
+            self.pause_button.configure(state="normal")
             timestamp = time.strftime("%Y%m%dT%H%M%S")
             file_name = self.file_name_entry.get().strip()  # Get the file name from the entry field
             if file_name:
@@ -344,6 +352,20 @@ class DART:
             # Stop recording
             self.camera_manager.stop_recording()
             self.record_button.configure(text="Saving", state="disabled")
+            self.pause_button.configure(state="disabled")
+            self.pause_button.configure(text="Pause", image=self.pause_icon)
+            self.camera_manager.is_paused = False
+
+    def toggle_pause(self):
+        if self.camera_manager.recording:
+            if self.camera_manager.is_paused:
+                self.pause_button.configure(text="Pause")
+                self.pause_button.configure(image=self.pause_icon)
+                self.camera_manager.is_paused = False
+            else:
+                self.pause_button.configure(text="Resume")
+                self.pause_button.configure(image=self.play_icon)
+                self.camera_manager.is_paused = True
 
     def on_write_finished(self):
         self.record_button.configure(text="Record", image=self.record_icon, state="normal")

@@ -1,5 +1,6 @@
 import os, pickle, logging, math
 import matplotlib.pyplot as plt
+from datetime import datetime
 from typing import Tuple
 import numpy as np
 
@@ -10,17 +11,20 @@ class Calibrator:
         self.pan_origin = None
         self.calibration_step = 0
         self.calibrated = False
+        self.calibration_age = None
 
         # Load calibration data if it exists
         calib_data_path = 'dev/config/calib_data.pkl'
         if os.path.exists(calib_data_path):
             with open(calib_data_path, 'rb') as f:
-                self.pan_origin, self.tilt_origin, self.rotation_matrix = pickle.load(f)
+                self.pan_origin, self.tilt_origin, self.rotation_matrix, self.date_time = pickle.load(f)
                 self.calibrated = True
+                self.calibration_age = (datetime.now() - self.date_time).total_seconds() / 3600
                 logging.info("Calibration data loaded successfully.")
                 print(f"Local origin: {self.pan_origin}")
         else:
             logging.info("No calibration data found.")
+
 
     def run(self, p1: np.ndarray, p2: np.ndarray):
         self.positions.append(p1)
@@ -61,9 +65,11 @@ class Calibrator:
 
         self.rotation_matrix = np.column_stack((x_axis, y_axis, z_axis))
 
+        time_stamp = datetime.now()
+
         os.makedirs('config', exist_ok=True)  # Ensure the config directory exists
         with open('dev/config/calib_data.pkl', 'wb') as f:
-            pickle.dump((self.pan_origin, self.tilt_origin, self.rotation_matrix), f)
+            pickle.dump((self.pan_origin, self.tilt_origin, self.rotation_matrix, time_stamp), f)
             logging.info("Calibration data saved successfully.")
 
     def find_closest_points(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
