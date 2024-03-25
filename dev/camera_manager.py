@@ -26,7 +26,7 @@ class CameraManager:
         self.is_reading = False
         self.start_t = None
         self.is_paused = False
-        self.frame_counter = 0
+        # self.frame_counter = 0
     
     def get_available_cameras(self):
         cameras = []
@@ -79,15 +79,17 @@ class CameraManager:
         if self.frame_thread is not None:
             self.frame_thread.join()
         self.frame_thread = None
-        print(f"Frames processed: {self.frame_counter} in {time.perf_counter() - self.start_t:.4f} s")
-        print(f"Frame rate: {self.frame_counter/(time.perf_counter() - self.start_t):.4f} fps")
-        self.frame_counter = 0
+        # print(f"Frames processed: {self.frame_counter} in {time.perf_counter() - self.start_t:.4f} s")
+        # print(f"Frame rate: {self.frame_counter/(time.perf_counter() - self.start_t):.4f} fps")
+        # self.frame_counter = 0
 
     def update_frame(self):
         while self.is_reading:
             ret, frame = self.cap.read()
             if ret:
-                self.frame_counter += 1
+                # self.frame_counter += 1
+                # Flip frame verically
+                frame = cv2.flip(frame, 0)
                 self.latest_frame = frame
                 
     def start_recording(self, filename):
@@ -97,10 +99,10 @@ class CameraManager:
 
         # Vidgear wrtier parameters
         output_params = {
-            "-input_framerate": self.fps,
-            "-r" : self.fps,
+            "-input_framerate": 30,
+            "-r" : 30,
             "-preset": "ultrafast",
-            "-crf": 21
+            "-crf": 18
         }
         # Define writer with defined parameters and suitable output filename for e.g. `Output.mp4
         self.writer = WriteGear(output=filename, logging=False, **output_params)
@@ -115,6 +117,9 @@ class CameraManager:
         while self.recording:
             logging.info("Capturing frame.")
             ret, frame = self.cap.read()
+
+            # Flip frame verically
+            frame = cv2.flip(frame, 0)
 
             if ret:
                 self.latest_frame = frame

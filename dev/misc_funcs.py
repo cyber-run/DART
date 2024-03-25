@@ -14,5 +14,9 @@ def set_realtime_priority():
         print(f"Error setting priority: {e}")
 
 def num_to_range(num, inMin, inMax, outMin, outMax):
-  return outMin + (float(num - inMin) / float(inMax - inMin) * (outMax
-                  - outMin))
+    angle = outMin + (float(num - inMin) / float(inMax - inMin) * (outMax - outMin))
+
+    # Min/Max value based on out min/max
+    angle = max(outMin, min(outMax, angle))
+
+    return angle

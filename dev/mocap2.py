@@ -59,7 +59,7 @@ class QTMStream(Thread):
 
     def _on_packet(self, packet) -> None:
         """
-        Process a packet stream 6D or 3D data.
+        Process a packet stream 3D data.
         ----------
         packet : QRTPacket
             Incoming packet from QTM
@@ -69,9 +69,8 @@ class QTMStream(Thread):
 
         # If no new component: mark as lost and return from function
         if not new_component:
-            if not self.lost:
-                logging.warning('[QTM] 3D Unlabelled marker not found.')
-                self.lost = True
+            logging.warning('[QTM] 3D Unlabelled marker not found.')
+            self.lost = True
             return
 
         pos = new_component[0]
@@ -79,19 +78,13 @@ class QTMStream(Thread):
         self.num_markers = len(new_component)
 
         # Ensure there is more than one component before accessing it
-        if self.calibration_target:
-            if len(new_component) > 1:
-                pos = new_component[1]
-                self.position2 = [pos.x, pos.y, pos.z]
-                if self.lost:
-                    logging.info('Calibration target detected with two markers.')
-                    self.lost = False
-            elif not self.lost:
-                logging.info('Calibration target is set but only one marker detected.')
-                self.lost = True
-        elif self.lost:
-            logging.info('Calibration target detected with one marker.')
-            self.lost = False
+        if self.calibration_target and len(new_component) > 1:
+            pos = new_component[1]
+            self.position2 = [pos.x, pos.y, pos.z]
+        else:
+            logging.info('Calibration target is set but only one marker detected.')
+
+        self.lost = False
 
     async def _close(self) -> None:
         """
@@ -117,8 +110,24 @@ class QTMControl(Thread):
         self._stay_open = True
         self.password = password
 
-    async def start(self):
+        self.loop = asyncio.new_event_loop()  # Create a new event loop for this thread
+        self._connection = None
+
+        self.start()
+
+    def run(self):
+        asyncio.set_event_loop(self.loop)  # Set this thread's event loop
+        self.loop.run_until_complete(self._life_cycle())
+        self.loop.close()
+
+    async def _life_cycle(self) -> None:
+        """
+        QTM wrapper coroutine.
+        """
         await self._connect()
+        while(self._stay_open):
+            await asyncio.sleep(1)
+        await self._close()
 
     async def _connect(self) -> None:
         """
@@ -128,7 +137,6 @@ class QTMControl(Thread):
         logging.info('[QTM] Connecting to QTM at %s', self.qtm_ip)
         self._connection = await qtm.connect(self.qtm_ip)
 
-        # Take control of QTM
         await self.take_control(self.password)
 
     async def take_control(self, password):
@@ -146,16 +154,18 @@ class QTMControl(Thread):
     async def stop_recording(self):
         await self._connection.stop()
 
-    async def _close(self) -> None:
+    async def _close(self):
         """
         End lifecycle by disconnecting from QTM machine.
         """
-        await self._connection.stream_frames_stop()
-        self._connection.disconnect()
+        if self._connection is not None:
+            await self._connection.stream_frames_stop()
+            self._connection.disconnect()
+
+
 
 async def main():
     target = QTMControl()
-    await target.start()
 
     await asyncio.sleep(2)
 

@@ -1,4 +1,4 @@
-from misc_funcs import set_realtime_priority
+from misc_funcs import set_realtime_priority, num_to_range
 import logging, pickle, time, os, cProfile
 from dyna_controller import *
 from importlib import reload
@@ -19,7 +19,7 @@ class DynaTracker:
         # Load calibration data if it exists
         if os.path.exists('dev/config/calib_data.pkl'):
             with open('dev/config/calib_data.pkl', 'rb') as f:
-                self.pan_origin, self.tilt_origin, self.rotation_matrix = pickle.load(f)
+                self.pan_origin, self.tilt_origin, self.rotation_matrix, _ = pickle.load(f)
                 logging.info("Calibration data loaded successfully.")
         else:
             logging.error("No calibration data found.")
@@ -51,9 +51,6 @@ class DynaTracker:
         pan_angle = math.degrees(math.atan2(point_local[1], point_local[0]))
         tilt_angle = math.degrees(math.atan2(point_local[2], math.sqrt(point_local[0]**2 + point_local[1]**2)))
         return pan_angle, tilt_angle
-
-    def num_to_range(self, num, inMin, inMax, outMin, outMax):
-        return outMin + (float(num - inMin) / float(inMax - inMin) * (outMax - outMin))
 
     def track(self):
         if self.target.lost:

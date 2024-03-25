@@ -645,6 +645,6 @@ def main2():
     dyna.set_torque(dyna.tilt_id, False)
 
 if __name__ == "__main__":
-    main()
-    # get_theta_bode()
+    # main()
+    get_theta_bode()
     # get_curr_bode()

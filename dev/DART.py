@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 import cProfile, time, cv2, os, asyncio
 from dyna_controller import DynaController
@@ -49,7 +49,10 @@ class DART:
         self.selected_com_port = ctk.StringVar(value="")
         self.selected_camera = ctk.StringVar(value="")
         
-        self.target = None
+        # Initialize QTM and Dynamixel controller objects
+        self.qtm_control = None
+        self.qtm_stream = None
+        self.qtm_control_loop = asyncio.get_event_loop()
 
         self.dyna = None
 
@@ -70,11 +73,12 @@ class DART:
         self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png").resize((96, 96)))
         self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png").resize((96, 96)))
         self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png").resize((96, 96)))
-        self.target_icon = ctk.CTkImage(Image.open("dev/icons/target.png").resize((96, 96)))
+        self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/icons/target.png").resize((96, 96)))
         self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png").resize((96, 96)))
         self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1008, 756), "black"), size=(1008, 756))
 
         self.app_status = "Idle"
+        self.file_name = None
 
         # Motor control values
         self.pan_value = 0
@@ -139,7 +143,7 @@ class DART:
         self.calibration_button = ctk.CTkButton(self.calibrate_frame, width = 80, text="Calibrate", command=self.calibrate)
         self.calibration_button.pack(side="left", padx=10, pady=10)
 
-        self.centre_button = ctk.CTkButton(self.calibrate_frame, width = 40, text="", image=self.target_icon, 
+        self.centre_button = ctk.CTkButton(self.calibrate_frame, width = 40, text="", image=self.qtm_stream_icon, 
                                            command=self.centre)
         self.centre_button.pack(side="left", padx=10, pady=10)
 
@@ -268,6 +272,12 @@ class DART:
         self.strength_label = ctk.CTkLabel(strength_frame, text="Strength: 60")
         self.strength_label.pack()
 
+        test_button_1 = ctk.CTkButton(img_processing_frame, text="Test 1", command=lambda: self.test_func_1())
+        test_button_1.pack(side="left", padx=10, pady=10)
+
+        test_button_2 = ctk.CTkButton(img_processing_frame, text="Test 2", command=lambda: self.test_func_2())
+        test_button_2.pack(side="left", padx=10, pady=10)
+
         # MoCap number of markers indicator
         num_marker_frame = ctk.CTkFrame(img_processing_frame)
         num_marker_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
@@ -284,9 +294,15 @@ class DART:
         self.age_label = ctk.CTkLabel(self.status_bar, text=f"Calibration age: {int(self.calibrator.calibration_age)} h", height=18)
         self.age_label.pack(side="left", padx=10, pady=0, anchor="e", expand=True)
 
+    def test_func_1(self):
+        self.qtm_control_loop.run_until_complete(self.qtm_control.start_recording())
+
+    def test_func_2(self):
+        self.qtm_control_loop.run_until_complete(self.qtm_control.set_qtm_event("Test Event"))
+
     def calibrate(self):
-        p1 = np.array(self.target.position)
-        p2 = np.array(self.target.position2)
+        p1 = np.array(self.qtm_stream.position)
+        p2 = np.array(self.qtm_stream.position2)
         self.calibrator.run(p1, p2)
 
     def track(self):
@@ -302,8 +318,8 @@ class DART:
         
         if self.calibrator.calibrated and self.track_process is None:
             # Close QTM connections
-            self.target._close()
-            self.target.close()
+            self.qtm_stream._close()
+            self.qtm_stream.close()
 
             # Close serial port
             self.dyna.close_port()
@@ -359,13 +375,25 @@ class DART:
     def toggle_pause(self):
         if self.camera_manager.recording:
             if self.camera_manager.is_paused:
+                # If the camera is paused, resume recording
                 self.pause_button.configure(text="Pause")
                 self.pause_button.configure(image=self.pause_icon)
                 self.camera_manager.is_paused = False
+
+                # Start camera recording and log a "Resumed" event
+                time_stamp = time.strftime("%Y%m%dT%H%M%S")
+                filename = os.path.join(self.video_path, f"{self.file_name}_{time_stamp}.mp4")
+                self.camera_manager.start_recording(filename)
+                self.qtm_control._set_qtm_event("Resumed")
             else:
+                # If the camera is not paused, pause recording
                 self.pause_button.configure(text="Resume")
                 self.pause_button.configure(image=self.play_icon)
                 self.camera_manager.is_paused = True
+
+                # Stop camera recording and log a "Paused" event
+                self.camera_manager.stop_recording()
+                self.qtm_control._set_qtm_event("Paused")
 
     def on_write_finished(self):
         self.record_button.configure(text="Record", image=self.record_icon, state="normal")
@@ -410,8 +438,8 @@ class DART:
             self.window.after(30, self.update_video_label)
 
     def update_num_marker_label(self):
-        if self.target is not None:
-            self.num_marker_label.configure(text=f"No. Markers: {self.target.num_markers}")
+        if self.qtm_stream is not None:
+            self.num_marker_label.configure(text=f"No. Markers: {self.qtm_stream.num_markers}")
             # Update number of markers at 5Hz -> this is a good proof of concept for marker averaging
             self.window.after(200, self.update_num_marker_label)
 
@@ -486,14 +514,15 @@ class DART:
 
     def connect_mocap(self):
         try:
-            self.target = QTMStream()
-            self.target.calibration_target = True
-
+            self.qtm_stream = QTMStream()
+            self.qtm_stream.calibration_target = True
+            time.sleep(1)
             self.qtm_control = QTMControl()
+            # self.qtm_control_loop(self.qtm_control.start())
             logging.info("Connected to QTM.")
         except Exception as e:
             logging.error(f"Error connecting to QTM: {e}")
-            self.target = None
+            self.qtm_stream = None
 
     def set_pan(self, value: float):
         if self.dyna is not None:
@@ -510,7 +539,9 @@ class DART:
             value = round(value, 3)
             self.tilt_value = value
             self.tilt_label.configure(text=f"Tilt angle: {value}")
-            angle = num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
+            # angle = num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
+            # Reverse tilt mapping direction
+            angle = num_to_range(self.tilt_value, 45, -45, 292.5, 337.5)
             self.dyna.set_pos(2, angle)
         else:
             logging.error("Dynamixel controller not connected.")
@@ -523,8 +554,11 @@ class DART:
 
     def on_closing(self):
         try:
-            self.target._close()
-            self.target.close()
+            self.qtm_stream._close()
+            self.qtm_stream.close()
+
+            self.qtm_control_loop.run_until_complete(self.qtm_control._close())
+            self.qtm_control_loop.close()
         except Exception as e:
             logging.info(f"Error closing QTM connection: {e}")
             
@@ -537,7 +571,8 @@ class DART:
 
         try:
             # Close the serial port
-            self.dyna.close_port()
+            if self.dyna is not None:
+                self.dyna.close_port()
         except Exception as e:
             logging.info(f"Error closing serial port: {e}")
 

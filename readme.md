@@ -47,4 +47,8 @@
 
 - [ ] Log event in mocap
 
-- thursday 
+- [ ] Cancel recording
+
+- [ ] File saving memory check
+
+- [ ] Get a bigger hard drive
