@@ -162,8 +162,6 @@ class QTMControl(Thread):
             await self._connection.stream_frames_stop()
             self._connection.disconnect()
 
-
-
 async def main():
     target = QTMControl()
 

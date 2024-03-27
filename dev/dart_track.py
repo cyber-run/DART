@@ -1,5 +1,6 @@
 from misc_funcs import set_realtime_priority, num_to_range
-import logging, pickle, time, os, cProfile
+import logging, pickle, time, os, cProfile, asyncio
+from PerfSleeper import PerfSleeper
 from dyna_controller import *
 from importlib import reload
 from qtm_mocap import *
@@ -32,10 +33,19 @@ class DynaTracker:
         # Create dynamixel controller object and open serial port
         self.dyna = DynaController(com_port)
         self.dyna.open_port()
+
+        self.dyna.set_gains(1, 650, 1300, 1200)
+        self.dyna.set_gains(2, 1400, 500, 900)
         
         # Default init operating mode into position
         self.dyna.set_op_mode(self.dyna.pan_id, 3)
         self.dyna.set_op_mode(self.dyna.tilt_id, 3)
+
+        self.counter = 0
+        self.start_time = time.perf_counter()
+
+        self.pan_angles = []
+        self.tilt_angles = []
 
     def tilt_global_to_local(self, point_global: np.ndarray) -> np.ndarray:
         if self.rotation_matrix is None:
@@ -53,9 +63,11 @@ class DynaTracker:
         return pan_angle, tilt_angle
 
     def track(self):
-        if self.target.lost:
-            logging.info("Target lost. Skipping iteration.")
-            return
+        # if self.target.lost:
+        #     logging.info("Target lost. Skipping iteration.")
+        #     return
+        
+        self.counter += 1
         
         logging.info("Tracking target.")
         
@@ -71,17 +83,25 @@ class DynaTracker:
         _, tilt_angle = self.calc_rot_comp(tilt_local_target_pos)
 
         # Convert geometric angles to dynamixel angles
-        pan_angle = self.num_to_range(pan_angle, 45, -45, 202.5, 247.5)
-        tilt_angle = self.num_to_range(tilt_angle, 45, -45, 292.5, 337.5)
+        pan_angle = num_to_range(pan_angle, 45, -45, 202.5, 247.5)
+        tilt_angle = num_to_range(tilt_angle, 45, -45, 292.5, 337.5)
 
-        # print(f"Pan angle: {pan_angle}, Tilt angle: {tilt_angle}")
         # Set the dynamixel to the calculated angles
-        self.dyna.set_sync_pos(pan_angle, tilt_angle)
-
+        self.dyna.set_sync_pos(round(pan_angle,2), round(tilt_angle,2))
+        
+        #  Get the current angles of the dynamixels
+        pan_angle, tilt_angle = self.dyna.get_sync_pos()
+        self.pan_angles.append(pan_angle)
+        self.tilt_angles.append(tilt_angle)
 
     def shutdown(self) -> None:
-        self.target._close()
-    
+        # print control frequency
+        end_time = time.perf_counter()
+        print(f"Control frequency: {self.counter / (end_time - self.start_time)} Hz")
+
+        #  Shutdown QTM
+        asyncio.run_coroutine_threadsafe(self.target._close(), asyncio.get_event_loop())
+
         # Close QTM connections
         self.target.close()
 
@@ -97,12 +117,13 @@ def dart_track():
     set_realtime_priority()
 
     dyna_tracker = DynaTracker()
+    perf_sleeper = PerfSleeper()
     
     try:
 
         while True:
             dyna_tracker.track()
-            # time.sleep(0.03)
+            # perf_sleeper.sleep_ms(0.1)
 
     except KeyboardInterrupt:
         dyna_tracker.shutdown()
@@ -116,5 +137,6 @@ def dart_track():
 
 if __name__ == '__main__':
     # cProfile.run('dart_track()')
+    # run dart track until keyboard interrupt then shutdown
     dart_track()
         

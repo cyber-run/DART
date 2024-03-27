@@ -43,12 +43,12 @@
 
 - [x]  sync recording camera
 
-- [ ] ~add thread for position recording on dyna_controller~
+- [x] add thread for position recording on dyna_controller
 
-- [ ] Log event in mocap
+- [x] Log and sync event in mocap
 
 - [ ] Cancel recording
 
 - [ ] File saving memory check
 
-- [ ] Get a bigger hard drive
+- [x] Get a bigger hard drive

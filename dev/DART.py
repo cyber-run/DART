@@ -1,6 +1,7 @@
 import logging
 logging.basicConfig(level=logging.INFO)
 
+from misc_funcs import num_to_range, set_realtime_priority
 import cProfile, time, cv2, os, asyncio
 from dyna_controller import DynaController
 from camera_manager import CameraManager
@@ -13,7 +14,6 @@ import serial.tools.list_ports
 import customtkinter as ctk
 from PIL import Image
 from qtm_mocap import *
-from misc_funcs import num_to_range
 import tkinter as tk
 import numpy as np
 
@@ -52,7 +52,8 @@ class DART:
         # Initialize QTM and Dynamixel controller objects
         self.qtm_control = None
         self.qtm_stream = None
-        self.qtm_control_loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        self.bridge = TkinterAsyncioBridge(loop)
 
         self.dyna = None
 
@@ -272,11 +273,14 @@ class DART:
         self.strength_label = ctk.CTkLabel(strength_frame, text="Strength: 60")
         self.strength_label.pack()
 
-        test_button_1 = ctk.CTkButton(img_processing_frame, text="Test 1", command=lambda: self.test_func_1())
+        test_button_1 = ctk.CTkButton(img_processing_frame, width=50, text="Test 1", command=self.test1)
         test_button_1.pack(side="left", padx=10, pady=10)
 
-        test_button_2 = ctk.CTkButton(img_processing_frame, text="Test 2", command=lambda: self.test_func_2())
+        test_button_2 = ctk.CTkButton(img_processing_frame, width=50, text="Test 2", command=self.test2)
         test_button_2.pack(side="left", padx=10, pady=10)
+
+        test_button_3 = ctk.CTkButton(img_processing_frame, width=50, text="Test 3", command=self.test3)
+        test_button_3.pack(side="left", padx=10, pady=10)
 
         # MoCap number of markers indicator
         num_marker_frame = ctk.CTkFrame(img_processing_frame)
@@ -294,11 +298,15 @@ class DART:
         self.age_label = ctk.CTkLabel(self.status_bar, text=f"Calibration age: {int(self.calibrator.calibration_age)} h", height=18)
         self.age_label.pack(side="left", padx=10, pady=0, anchor="e", expand=True)
 
-    def test_func_1(self):
-        self.qtm_control_loop.run_until_complete(self.qtm_control.start_recording())
+    def test1(self):
+        self.bridge.run_coroutine(self.qtm_control.start_recording())
 
-    def test_func_2(self):
-        self.qtm_control_loop.run_until_complete(self.qtm_control.set_qtm_event("Test Event"))
+    def test2(self):
+        self.bridge.run_coroutine(self.qtm_control.stop_recording())
+
+    def test3(self):
+        timestamp = time.strftime("%Y%m%dT%H%M%S")
+        self.bridge.run_coroutine(self.qtm_control.set_qtm_event(timestamp))
 
     def calibrate(self):
         p1 = np.array(self.qtm_stream.position)
@@ -500,7 +508,7 @@ class DART:
         else:
             self.cam_combobox.set("")
 
-    def connect_camera(self, event=None):
+    def connect_camera(self):
         selected_camera = self.selected_camera.get()
         if selected_camera:
             camera_index = int(selected_camera.split(" ")[1])
@@ -516,9 +524,11 @@ class DART:
         try:
             self.qtm_stream = QTMStream()
             self.qtm_stream.calibration_target = True
-            time.sleep(1)
+
             self.qtm_control = QTMControl()
-            # self.qtm_control_loop(self.qtm_control.start())
+
+            # Start the asyncio event loop for the bridge
+            self.bridge.start()
             logging.info("Connected to QTM.")
         except Exception as e:
             logging.error(f"Error connecting to QTM: {e}")
@@ -539,7 +549,9 @@ class DART:
             value = round(value, 3)
             self.tilt_value = value
             self.tilt_label.configure(text=f"Tilt angle: {value}")
+            
             # angle = num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
+
             # Reverse tilt mapping direction
             angle = num_to_range(self.tilt_value, 45, -45, 292.5, 337.5)
             self.dyna.set_pos(2, angle)
@@ -554,17 +566,22 @@ class DART:
 
     def on_closing(self):
         try:
-            self.qtm_stream._close()
-            self.qtm_stream.close()
+            if self.qtm_stream is not None:
+                asyncio.run_coroutine_threadsafe(self.qtm_stream._close(), asyncio.get_event_loop())
+                self.qtm_stream.close()
 
-            self.qtm_control_loop.run_until_complete(self.qtm_control._close())
-            self.qtm_control_loop.close()
+            if self.qtm_control is not None:
+                asyncio.run_coroutine_threadsafe(self.qtm_control._close(), asyncio.get_event_loop())
+                self.qtm_control.close()
+
+            self.bridge.stop()
         except Exception as e:
             logging.info(f"Error closing QTM connection: {e}")
             
         try:
             # Close the camera
             self.is_live = False
+            self.camera_manager.stop_frame_thread()
             self.camera_manager.release()
         except Exception as e:
             logging.info(f"Error closing camera or serial port: {e}")

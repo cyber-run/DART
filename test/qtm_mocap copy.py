@@ -191,12 +191,12 @@ class QTMControl(Thread):
         self.join()
 
 class TkinterAsyncioBridge:
-    def __init__(self, loop):
-        self.loop = loop
-        self.thread = threading.Thread(target=self._run_event_loop, daemon=True)
+    def __init__(self, root):
+        self.root = root
+        self.loop = asyncio.new_event_loop()
 
     def start(self):
-        self.thread.start()
+        threading.Thread(target=self._run_event_loop, daemon=True).start()
 
     def _run_event_loop(self):
         asyncio.set_event_loop(self.loop)
@@ -204,7 +204,6 @@ class TkinterAsyncioBridge:
 
     def stop(self):
         self.loop.call_soon_threadsafe(self.loop.stop)
-        self.thread.join()
 
     def run_coroutine(self, coro):
         asyncio.run_coroutine_threadsafe(coro, self.loop)

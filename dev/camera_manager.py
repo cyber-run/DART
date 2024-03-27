@@ -1,4 +1,4 @@
-import os, time, cv2, logging, EasyPySpin
+import os, time, cv2, logging, EasyPySpin, warnings
 from vidgear.gears import WriteGear
 from threading import Thread
 from queue import Queue
@@ -6,6 +6,9 @@ from queue import Queue
 
 class CameraManager:
     def __init__(self):
+        # Settings the warnings to be ignored 
+        warnings.filterwarnings('ignore') 
+
         self.cap = None
         self.initialize_camera()
 
