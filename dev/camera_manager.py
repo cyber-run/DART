@@ -1,51 +1,35 @@
-import os, time, cv2, logging, EasyPySpin, warnings
+import time, cv2, logging, EasyPySpin, warnings
 from vidgear.gears import WriteGear
 from threading import Thread
 from queue import Queue
 
+# Settings the warnings to be ignored 
+warnings.filterwarnings('ignore') 
 
 class CameraManager:
+    """Manages camera operations including live feed and recording."""
     def __init__(self):
-        # Settings the warnings to be ignored 
-        warnings.filterwarnings('ignore') 
-
         self.cap = None
         self.initialize_camera()
-
-        # Get camera properties
-        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.frame_size = (self.frame_width, self.frame_height)
-        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
 
         # Initialize video recording params
         self.frame_queue = Queue()
         self.recording = False
         self.writer = None
-        self.writing_thread = None
+        self.is_paused = False
 
+        # Initalise frane streaming params
         self.latest_frame = None
         self.frame_thread = None
         self.is_reading = False
-        self.start_t = None
-        self.is_paused = False
-        # self.frame_counter = 0
-    
-    def get_available_cameras(self):
-        cameras = []
-        i = 0
-        while True:
-            try:
-                cap = EasyPySpin.VideoCapture(i)
-                if cap.isOpened():
-                    cameras.append(f"Camera {i}")
-                    cap.release()
-                else:
-                    break
-            except:
-                break
-            i += 1
-        return cameras
+
+        self.initialise_cam_props()
+
+    def initialise_cam_props(self):
+        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.frame_size = (self.frame_width, self.frame_height)
+        self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
 
     def connect_camera(self, camera_index):
         self.release()
@@ -75,16 +59,12 @@ class CameraManager:
         self.is_reading = True
         self.frame_thread = Thread(target=self.update_frame, daemon=True)
         self.frame_thread.start()
-        self.start_t = time.perf_counter()
 
     def stop_frame_thread(self):
         self.is_reading = False
         if self.frame_thread is not None:
             self.frame_thread.join()
         self.frame_thread = None
-        # print(f"Frames processed: {self.frame_counter} in {time.perf_counter() - self.start_t:.4f} s")
-        # print(f"Frame rate: {self.frame_counter/(time.perf_counter() - self.start_t):.4f} fps")
-        # self.frame_counter = 0
 
     def update_frame(self):
         while self.is_reading:
@@ -96,10 +76,6 @@ class CameraManager:
                 self.latest_frame = frame
                 
     def start_recording(self, filename):
-        # cv2 writer parameters
-        # fourcc = cv2.VideoWriter_fourcc(*'H264')
-        # self.writer = cv2.VideoWriter(filename, fourcc, self.fps, self.frame_size, isColor=False)
-
         # Vidgear wrtier parameters
         output_params = {
             "-input_framerate": 30,
@@ -107,14 +83,17 @@ class CameraManager:
             "-preset": "ultrafast",
             "-crf": 18
         }
+
         # Define writer with defined parameters and suitable output filename for e.g. `Output.mp4
         self.writer = WriteGear(output=filename, logging=False, **output_params)
 
+        # Start recording
         self.recording = True
 
-        Thread(target=self.queue_frames, daemon=True).start()
-        self.writing_thread = Thread(target=self.write_frames)
-        self.writing_thread.start()
+        queue_thread = Thread(target=self.queue_frames, daemon=True)
+        writing_thread = Thread(target=self.write_frames, daemon=True)
+        queue_thread.start()
+        writing_thread.start()
 
     def queue_frames(self):
         while self.recording:
@@ -133,19 +112,18 @@ class CameraManager:
         self.frame_queue.put(None)
 
     def write_frames(self):
-        while not self.frame_queue.empty() or self.recording:
-            if not self.frame_queue.empty():
-                frame = self.frame_queue.get()
-                if frame is not None and frame.size != 0:
-                    logging.info("Writing frame...")
-                    # Convert ndarray to cv2.imshow compatible format
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                    self.writer.write(frame)
-            else:
-                time.sleep(0.001)  # Add a small delay to avoid excessive CPU usage
+        while True:
+            frame = self.frame_queue.get()
+            if frame is None:
+                break
+            if frame.size != 0:
+                logging.info("Writing frame...")
+                # Convert ndarray to cv2.imshow compatible format
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                self.writer.write(frame)
 
         self.writer.close()
-        
+
         # Execute the callback function if provided
         if self.on_write_finished:
             self.on_write_finished()
@@ -155,6 +133,22 @@ class CameraManager:
 
     def stop_recording(self):
         self.recording = False
+
+    def get_available_cameras(self):
+        cameras = []
+        i = 0
+        while True:
+            try:
+                cap = EasyPySpin.VideoCapture(i)
+                if cap.isOpened():
+                    cameras.append(f"Camera {i}")
+                    cap.release()
+                else:
+                    break
+            except:
+                break
+            i += 1
+        return cameras
 
 
 if __name__ == "__main__":

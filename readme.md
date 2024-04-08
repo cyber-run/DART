@@ -39,16 +39,21 @@
 
 - [x] add video compression -> VidGear
 
-- [ ] take the mean of multiple markers
-
 - [x]  sync recording camera
 
 - [x] add thread for position recording on dyna_controller
 
 - [x] Log and sync event in mocap
 
+- [x] Get a bigger hard drive
+
+- [ ] Log position readings
+
 - [ ] Cancel recording
 
-- [ ] File saving memory check
+- [ ] take the mean of multiple markers
 
-- [x] Get a bigger hard drive
+- [ ] CHECK MOTOR SETTINGS ie pwm ramp
+
+- [ ] Link mocap control and all recording functions together
+

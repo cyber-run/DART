@@ -235,6 +235,9 @@ def close_app():
 if __name__ == '__main__':
     root = tk.Tk()
     root.title("QTM Control")
+
+    #  asyncio.get_event_loop().set_debug(True)
+    loop = asyncio.get_event_loop()
     
     control = QTMControl()  # Assuming this is modified to not start automatically
     bridge = TkinterAsyncioBridge(root)

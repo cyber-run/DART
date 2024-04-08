@@ -1,6 +1,6 @@
 from misc_funcs import set_realtime_priority, num_to_range
 import logging, pickle, time, os, cProfile, asyncio
-from PerfSleeper import PerfSleeper
+from dev.perf_sleeper import PerfSleeper
 from dyna_controller import *
 from importlib import reload
 from qtm_mocap import *
@@ -42,10 +42,15 @@ class DynaTracker:
         self.dyna.set_op_mode(self.dyna.tilt_id, 3)
 
         self.counter = 0
-        self.start_time = time.perf_counter()
 
+        self.start_time = time.perf_counter()
+        self.data_name = time.strftime("%d%mT%H%M%S")
+
+        self.desired_pan_angles = []
+        self.desired_tilt_angles = []
         self.pan_angles = []
         self.tilt_angles = []
+        self.time_stamp = []
 
     def tilt_global_to_local(self, point_global: np.ndarray) -> np.ndarray:
         if self.rotation_matrix is None:
@@ -63,11 +68,24 @@ class DynaTracker:
         return pan_angle, tilt_angle
 
     def track(self):
-        # if self.target.lost:
-        #     logging.info("Target lost. Skipping iteration.")
-        #     return
+        if self.target.lost:
+            logging.info("Target lost. Skipping iteration.")
+            return
+
+        # 1 minutes after start time save the data and wipe the lists
+        if time.perf_counter() - self.start_time > 60:
+            # Save the data into videos folder with time stamp name
+            with open(f"dev/videos/{self.data_name}.pkl", 'wb') as f:
+                pickle.dump([self.desired_pan_angles, self.desired_tilt_angles, self.pan_angles, self.tilt_angles, self.time_stamp], f)
+            self.desired_pan_angles = []
+            self.desired_tilt_angles = []
+            self.pan_angles = []
+            self.tilt_angles = []
+            self.time_stamp = []
+            self.start_time = time.perf_counter()
+            self.data_name = time.strftime("%d%mT%H%M%S")
         
-        self.counter += 1
+        # self.counter += 1
         
         logging.info("Tracking target.")
         
@@ -84,15 +102,20 @@ class DynaTracker:
 
         # Convert geometric angles to dynamixel angles
         pan_angle = num_to_range(pan_angle, 45, -45, 202.5, 247.5)
-        tilt_angle = num_to_range(tilt_angle, 45, -45, 292.5, 337.5)
+        tilt_angle = num_to_range(tilt_angle, 45, -45, 112.5, 157.5)
 
         # Set the dynamixel to the calculated angles
         self.dyna.set_sync_pos(round(pan_angle,2), round(tilt_angle,2))
         
         #  Get the current angles of the dynamixels
-        pan_angle, tilt_angle = self.dyna.get_sync_pos()
-        self.pan_angles.append(pan_angle)
-        self.tilt_angles.append(tilt_angle)
+        real_pan_angle, real_tilt_angle = self.dyna.get_sync_pos()
+
+        # Log the desired, real, and time stamp
+        self.pan_angles.append(real_pan_angle)
+        self.tilt_angles.append(real_tilt_angle)
+        self.desired_pan_angles.append(pan_angle)
+        self.desired_tilt_angles.append(tilt_angle)
+        self.time_stamp.append(time.strftime("%d%mT%H%M%S"))
 
     def shutdown(self) -> None:
         # print control frequency
@@ -117,7 +140,6 @@ def dart_track():
     set_realtime_priority()
 
     dyna_tracker = DynaTracker()
-    perf_sleeper = PerfSleeper()
     
     try:
 
