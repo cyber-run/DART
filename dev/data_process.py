@@ -195,69 +195,71 @@ plot_error_against_velocity(velocities, phase_delay, fov_width, resolution_x)
 
 #%%
 
-def calculate_and_plot_errors_based_on_velocity(frequencies, pan_phases, tilt_phases, amplitude, fov_width, fov_height, resolution_x, resolution_y):
+
+def calculate_and_plot_errors_based_on_velocity(frequencies, pan_phases, tilt_phases, amplitude):
     """
-    Calculate the spatial tracking errors based on derived tangential target velocity and plot.
+    Calculate the spatial tracking errors based on target velocity and plot the errors against velocities.
     """
-    # Calculate derived velocities
-    velocities = 2 * amplitude * frequencies  # 2Af
-    
-    # Calculate spatial errors for derived velocities
-    pan_errors = [amplitude * phase / 180 for phase in pan_phases]
-    tilt_errors = [amplitude * phase / 180 for phase in tilt_phases]
-    
-    # Convert angular errors to pixels
-    pan_errors_pixels = [error * (resolution_x / fov_width) for error in pan_errors]
-    tilt_errors_pixels = [error * (resolution_y / fov_height) for error in tilt_errors]
-    
-    # Combine errors for total tracking error
-    total_errors_pixels = np.sqrt(np.array(pan_errors_pixels) ** 2 + np.array(tilt_errors_pixels) ** 2)
-    
-    # Plot
+    velocities = 2 * amplitude * frequencies  # deg/sec
+
+    # Assuming phase in degrees directly translates into angular error
+    pan_errors_deg = amplitude * np.sin(np.radians(pan_phases))
+    tilt_errors_deg = amplitude * np.sin(np.radians(tilt_phases))
+
+    # Plotting the tracking error against tangential target velocities
     plt.figure(figsize=(10, 6))
-    plt.plot(velocities, total_errors_pixels, '-x')
-    plt.xlabel('Tangential Target Velocity (degrees/second)')
-    plt.ylabel('Tracking Error (pixels)')
-    plt.title('Tracking Error vs. Tangential Target Velocity')
+    plt.plot(velocities, pan_errors_deg, '-x')
+    plt.plot(velocities, tilt_errors_deg, '-x')
+    plt.xlabel('Target Angular Velocity (degrees/second)')
+    plt.ylabel('Tracking Error (deg)')
+    plt.title('Tracking Error vs. Angular Target Velocity')
+    plt.xlim(0, 100)
     plt.grid(True)
     plt.show()
 
 # Parameters for spatial error calculation
 amplitude = 30  # degrees
-fov_width = 90  # degrees
-fov_height = 60  # degrees
-resolution_x = 1920  # pixels
-resolution_y = 1080  # pixels
 
-calculate_and_plot_errors_based_on_velocity(frequencies, pan_phases, tilt_phases, amplitude, fov_width, fov_height, resolution_x, resolution_y)
+calculate_and_plot_errors_based_on_velocity(frequencies, pan_phases, tilt_phases, amplitude)
 
-def calculate_angular_fov(distance, target_diameter):
+# %%
+
+def calculate_angular_fov(distance: float, target_diameter: float) -> float:
     """
-    Calculate the angular field of view (FOV) based on target size and distance.
-    The target occupies the central 25% of the FOV.
-    """
-    fov_cm = (target_diameter / 0.25)  # FOV width in cm, since the target is 25% of FOV
-    # Convcert FOV width to angular FOV
-    fov_degrees = 2 * np.rad2deg(np.arctan(fov_cm / (2 * distance)))
+    Calculate the angular field of view (FOV) based on the target size and distance.
+    Assumes the target occupies the central 25% of the FOV.
 
+    :param distance: Distance to the target in meters.
+    :param target_diameter: Diameter of the target in centimeters.
+    :return: Angular FOV in degrees.
+    """
+    # FOV width in cm, since the target is 25% of FOV
+    fov_cm = (target_diameter / 0.25)
+    # Convert FOV width to angular FOV
+    fov_degrees = 2 * np.rad2deg(np.arctan(fov_cm / (2 * distance * 100)))  # distance converted to cm
+
+    print(f"Angular FOV for distance {distance}m: {fov_degrees:.2f} degrees")
     return fov_degrees
 
-def calculate_tracking_error(encoder_resolution, angular_fov):
+def calculate_tracking_error(encoder_resolution: int, angular_fov: float) -> float:
     """
     Calculate the tracking error based on encoder resolution and angular FOV.
+
+    :param encoder_resolution: The resolution of the encoder in steps.
+    :param angular_fov: The angular field of view in degrees.
+    :return: Tracking error as a percentage.
     """
     # Calculate the angular error corresponding to half the encoder's resolution
     angular_error_per_step = 360 / encoder_resolution  # Total angular range divided by resolution
     half_angular_error = angular_error_per_step / 2
     # Relate this angular error to the angular FOV
     error_ratio = half_angular_error / (angular_fov / 2)  # Divide by 2 for the error on one side
-    return error_ratio * 100  # Convert to percentage for readability
+    return error_ratio   # Convert to percentage for readability
 
 # Parameters
 encoder_resolution = 4096
-target_velocity = 5  # m/s (not directly used in this calculation)
-target_diameter = 0.08  # cm
-distances = np.linspace(2, 10, 6)  # From 2m to 5m
+target_diameter = 5  # cm
+distances = np.linspace(2, 10, 20)  # From 2m to 10m
 
 # Calculate FOV and Errors
 angular_fovs = [calculate_angular_fov(distance, target_diameter) for distance in distances]
@@ -267,7 +269,7 @@ tracking_errors = [calculate_tracking_error(encoder_resolution, fov) for fov in 
 plt.figure(figsize=(10, 6))
 plt.plot(distances, tracking_errors, '-o')
 plt.xlabel('Distance to Target (m)')
-plt.ylabel('Tracking Error (%)')
+plt.ylabel('Tracking Error (FOV/Resolution')
 plt.title('Tracking Error vs. Distance')
 plt.grid(True)
 plt.show()
