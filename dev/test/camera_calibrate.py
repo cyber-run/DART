@@ -5,7 +5,7 @@ import os
 
 # Parameters
 capture_folder = "calibration_images"
-chessboard_size = (7, 6)
+chessboard_size = (8, 6) # Number of inner corners (width, height) of the chessboard pattern
 save_img_key = 32  # Space bar to capture the image
 exit_key = 27  # ESC key to exit the capture mode and start calibration
 
