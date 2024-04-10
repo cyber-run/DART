@@ -1,6 +1,5 @@
 from misc_funcs import set_realtime_priority, num_to_range
 import logging, pickle, time, os, cProfile, asyncio
-from perf_sleeper import PerfSleeper
 from dyna_controller import *
 from importlib import reload
 from qtm_mocap import *
