@@ -12,13 +12,12 @@ from dart_track import dart_track
 from calibrate import Calibrator
 import serial.tools.list_ports
 import customtkinter as ctk
-from PIL import Image
+from dart_gui import DARTGUI
 from qtm_mocap import *
+from PIL import Image
 import tkinter as tk
 import numpy as np
 
-
-GLOBAL_FONT = ("default_theme", 16)
 
 class DART:
     def __init__(self, window: ctk.CTk):
@@ -26,7 +25,7 @@ class DART:
         self.init_hardware()
 
         self.init_params()
-        self.setup_gui_elements()
+        self.gui = DARTGUI(window, self)
 
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.window.mainloop()
@@ -92,231 +91,6 @@ class DART:
 
         # Memory usage var
         self.memory_usage = None
-
-    def setup_gui_elements(self):
-        self.video_label = ctk.CTkLabel(self.window, text="")
-        self.video_label.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        self.video_label.configure(image=self.placeholder_image)
-        self.window.grid_rowconfigure(0, weight=1)  # Allow vertical expansion
-        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
-
-        ################## Frame for motor controls ##################
-        dyna_control_frame = ctk.CTkFrame(self.window)
-        dyna_control_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-        self.window.grid_rowconfigure(0, weight=1)  # Allow vertical expansion
-
-        # Get available serial ports for combo box
-        serial_ports = get_serial_ports()
-
-        # Serial port frame
-        serial_frame = ctk.CTkFrame(dyna_control_frame)
-        serial_frame.pack(side="top", padx=10, pady=10)
-
-        # Combo box for selecting the COM port
-        self.com_port_combobox = ctk.CTkComboBox(serial_frame, width=100, values=serial_ports,
-                                                variable=self.selected_com_port,
-                                                command=lambda choice: self.connect_dyna_controller())
-        self.com_port_combobox.pack(side="left", padx=5, pady=5)
-
-        # Button refresh serial port list
-        self.serial_refresh = ctk.CTkButton(serial_frame, width=28, text="", 
-                                            image=self.refresh_icon, command=self.update_serial_ports_dropdown)
-        self.serial_refresh.pack(side="left", padx=5, pady=5)
-
-        # Assuming dyna_control_frame itself is packed in the window, that's okay.
-        # Now, let's set up control_frame, pan_frame, and tilt_frame using grid consistently.
-
-        # control_frame will directly contain pan_frame and tilt_frame, so we need to use grid on it as well.
-        control_frame = ctk.CTkFrame(dyna_control_frame, height = 2000)
-        control_frame.pack(side="top", padx=10, pady=10, fill="x", expand=True)  # This is fine since it's directly within dyna_control_frame
-
-        # Since control_frame will use grid for its children, make sure not to mix pack within those children.
-        # Frame for pan slider and label
-        pan_frame = ctk.CTkFrame(control_frame)
-        pan_frame.grid(row=0, column=0, padx=10, pady=10)  # Use grid within control_frame
-        self.pan_label = ctk.CTkLabel(pan_frame, text="Pan: 0°", font=GLOBAL_FONT, padx=5, pady=5)
-        self.pan_label.pack()
-        self.pan_slider = ctk.CTkSlider(pan_frame, from_=-45, to=45, command=self.set_pan, orientation="vertical", height=400)
-        self.pan_slider.set(self.pan_value)
-        self.pan_slider.pack(padx=5, pady=5)  # Packing inside pan_frame is fine
-
-        # Frame for tilt slider and label
-        tilt_frame = ctk.CTkFrame(control_frame)
-        self.tilt_label = ctk.CTkLabel(tilt_frame, text="Tilt: 0°", font=GLOBAL_FONT, padx=5, pady=5)
-        self.tilt_label.pack()
-        tilt_frame.grid(row=0, column=1, padx=10, pady=10)  # Place it next to pan_frame using grid
-        self.tilt_slider = ctk.CTkSlider(tilt_frame, from_=-45, to=45, command=self.set_tilt, orientation="vertical", height=400)
-        self.tilt_slider.set(self.tilt_value)
-        self.tilt_slider.pack(padx=5, pady=5)  # Packing inside tilt_frame is fine
-
-
-        # Calibrate frame
-        self.calibrate_frame = ctk.CTkFrame(dyna_control_frame)
-        self.calibrate_frame.pack(side="top", padx=10, pady=10)
-
-        # Create a calibration button
-        self.calibration_button = ctk.CTkButton(self.calibrate_frame, width = 80, text="Calibrate", command=self.calibrate, font=GLOBAL_FONT)
-        self.calibration_button.pack(side="left", padx=10, pady=10)
-
-        self.centre_button = ctk.CTkButton(self.calibrate_frame, width = 40, text="", image=self.qtm_stream_icon, 
-                                           command=self.centre, font=GLOBAL_FONT)
-        self.centre_button.pack(side="left", padx=10, pady=10)
-
-        # Create a track button
-        self.track_button = ctk.CTkButton(dyna_control_frame, text="Track", command=self.track, font=GLOBAL_FONT)
-        self.track_button.pack(side="top", padx=10, pady=10)
-
-        ################## Frame for camera controls ##################
-        camera_control_frame = ctk.CTkFrame(self.window)
-        camera_control_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
-        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
-
-        # Camera combo box frame
-        cam_frame = ctk.CTkFrame(camera_control_frame)
-        cam_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
-
-        # Dropdown combo box for selecting the camera
-        self.cam_combobox = ctk.CTkComboBox(cam_frame, width=100, values=[],
-                                            variable=self.selected_camera,
-                                            command=self.connect_camera)
-        self.cam_combobox.pack(side="left", padx=5, pady=5)
-
-        # Button to refresh camera list
-        self.cam_refresh = ctk.CTkButton(cam_frame, width=28, text="", image=self.refresh_icon,
-                                        command=self.update_camera_dropdown, font=GLOBAL_FONT)
-        self.cam_refresh.pack(side="left", padx=5, pady=5)
-
-        # Button to start/stop live feed
-        self.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", image=self.play_icon,
-                                                command=self.toggle_video_feed, font=GLOBAL_FONT)
-        self.toggle_video_button.pack(side="left", padx=10, anchor="center", expand=True)
-
-        # Frame for exposure slider and label
-        exposure_frame = ctk.CTkFrame(camera_control_frame)
-        exposure_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
-        self.exposure_slider = ctk.CTkSlider(exposure_frame, width=140, from_=4, to=4000, command=self.adjust_exposure)
-        self.exposure_slider.set(1000)
-        self.exposure_slider.pack(padx=5, pady=5, expand=True, fill="x")
-        self.exposure_label = ctk.CTkLabel(exposure_frame, text="Exposure (us): 1000", font=GLOBAL_FONT)
-        self.exposure_label.pack()
-
-        # Frame for gain slider and label
-        gain_frame = ctk.CTkFrame(camera_control_frame)
-        gain_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
-        self.gain_slider = ctk.CTkSlider(gain_frame, width =140, from_=0, to=47, command=self.adjust_gain)
-        self.gain_slider.set(10) 
-        self.gain_slider.pack(padx=5, pady=5, expand=True, fill="x")
-        self.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 10", font=GLOBAL_FONT)
-        self.gain_label.pack()
-
-        # Frame for video path and file name
-        video_path_frame = ctk.CTkFrame(camera_control_frame)
-        video_path_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
-
-        # Button to open folder dialog
-        self.file_button = ctk.CTkButton(video_path_frame, width=28, text="", image=self.folder_icon, command=self.select_folder, font=GLOBAL_FONT)
-        self.file_button.pack(side="left", padx=5, pady=5)
-
-        # Text entry field for initial file name
-        self.file_name_entry = ctk.CTkEntry(video_path_frame, width=120, placeholder_text="Enter file name", font=GLOBAL_FONT)
-        self.file_name_entry.pack(side="left", padx=5, pady=5)
-
-        # Button to start/stop recording
-        self.record_button = ctk.CTkButton(camera_control_frame, width=90, text="Record", image=self.record_icon, command=self.toggle_record, font=GLOBAL_FONT)
-        self.record_button.pack(side="left", padx=10, anchor="center", expand=True)
-
-        # Button to pause recording
-        self.pause_button = ctk.CTkButton(camera_control_frame, width=100, text="Pause", image=self.pause_icon, command=self.toggle_pause, state="disabled", font=GLOBAL_FONT)
-        self.pause_button.pack(side="left", padx=10, anchor="center", expand=True)
-
-        # FPS indicator display
-        fps_frame = ctk.CTkFrame(camera_control_frame)
-        fps_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
-        self.fps_label = ctk.CTkLabel(fps_frame, text=f"FPS: {round(self.camera_manager.fps, 2)}", font=GLOBAL_FONT)
-        self.fps_label.pack(padx=5, pady=5)
-
-        ################## Frame for image processing detect ##################
-        img_processing_frame = ctk.CTkFrame(self.window)
-        img_processing_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
-        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
-        img_processing_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
-        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
-
-        # Button to start/stop saving images
-        self.mocap_button = ctk.CTkButton(img_processing_frame, width=80, text="MoCap", image=self.sync_icon, 
-                                          command=self.mocap_button_press, font=GLOBAL_FONT)
-        self.mocap_button.pack(side="left", padx=10)
-
-        # Checkbox to enable/disable crosshair used to help with calibration
-        self.crosshair_checkbox = ctk.CTkCheckBox(
-            img_processing_frame,
-            text="Crosshair",
-            variable=self.show_crosshair,
-            command=lambda: setattr(self.image_pro, 'show_crosshair', self.show_crosshair.get()),
-            onvalue=True,
-            offvalue=False, 
-            font=GLOBAL_FONT
-        )
-        self.crosshair_checkbox.pack(side="left", padx=10, anchor="center", expand=True)
-
-        # Checkbox to enable/disable circle detection algorithm
-        self.detect_checkbox = ctk.CTkCheckBox(
-            img_processing_frame,
-            text="Detect",
-            variable=self.detect_flag,
-            command=lambda: setattr(self.image_pro, 'detect_circle_flag', self.detect_flag.get()),
-            onvalue=True,
-            offvalue=False, 
-            font=GLOBAL_FONT
-        )
-        self.detect_checkbox.pack(side="left", padx=10, anchor="center", expand=True)
-
-        # Frame for threshold slider and label for binary mask -> used in Hough transform
-        threshold_frame = ctk.CTkFrame(img_processing_frame)
-        threshold_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
-        self.threshold_slider = ctk.CTkSlider(threshold_frame, from_=0, to=255, command=self.set_threshold)
-        self.threshold_slider.set(70)
-        self.threshold_slider.pack(padx=5, pady=5)
-        self.threshold_label = ctk.CTkLabel(threshold_frame, text="Threshold: 70", font=GLOBAL_FONT)
-        self.threshold_label.pack()
-
-        # Frame for strength slider and label for Hough circle detection
-        strength_frame = ctk.CTkFrame(img_processing_frame)
-        strength_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
-        self.strength_slider = ctk.CTkSlider(strength_frame, from_=30, to=100, command=self.set_strength)
-        self.strength_slider.set(60)
-        self.strength_slider.pack(padx=5, pady=5)
-        self.strength_label = ctk.CTkLabel(strength_frame, text="Strength: 60", font=GLOBAL_FONT)
-        self.strength_label.pack()
-
-        # test_button_1 = ctk.CTkButton(img_processing_frame, width=50, text="Test 1", command=self.test1, font=GLOBAL_FONT)
-        # test_button_1.pack(side="left", padx=10, pady=10)
-
-        # test_button_2 = ctk.CTkButton(img_processing_frame, width=50, text="Test 2", command=self.test2, font=GLOBAL_FONT)
-        # test_button_2.pack(side="left", padx=10, pady=10)
-
-        # test_button_3 = ctk.CTkButton(img_processing_frame, width=50, text="Test 3", command=self.test3, font=GLOBAL_FONT)
-        # test_button_3.pack(side="left", padx=10, pady=10)
-
-        # MoCap number of markers indicator
-        num_marker_frame = ctk.CTkFrame(img_processing_frame)
-        num_marker_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
-        self.num_marker_label = ctk.CTkLabel(num_marker_frame, text="No. Markers: 0", font=GLOBAL_FONT)
-        self.num_marker_label.pack(padx=5, pady=5)
-
-        # Add status bar to bottom of window
-        self.status_bar = ctk.CTkFrame(self.window, height=5, corner_radius=0, border_width=-2)
-        self.status_bar.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(15,0))
-
-        # Add label to status bar
-        self.status_label = ctk.CTkLabel(self.status_bar, text=self.app_status, height=18, font=("default_theme", 16))
-        self.status_label.pack(side="left", padx=10, pady=0, anchor="center")
-        self.age_label = ctk.CTkLabel(self.status_bar, text=f"Calibration age: {int(self.calibrator.calibration_age)} h", height=24, font=("default_theme", 16))
-        self.age_label.pack(side="left", padx=10, pady=0, anchor="e", expand=True)
-
-        self.memory_label = ctk.CTkLabel(self.status_bar, text=f"Memory usage: {self.memory_usage}%", height=24, font=("default_theme", 16))
-        self.memory_label.pack(side="right", padx=10, pady=0, anchor="e", expand=False)
-        self.get_mem()
 
     def get_mem(self):
         # Get system memory usage as a percentage
