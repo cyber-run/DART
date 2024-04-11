@@ -11,31 +11,106 @@ class DARTGUI:
         self.window = window
         self.dart = dart_instance
 
-        # Set up the GUI
-        self.setup_gui()
+        self.current_view = None
+
+        # Set up persistent GUI elements
+        self.setup_sidebar()
+        self.setup_status_bar()
+
+        # Set up track view
+        self.setup_track_view()
+
+    def setup_track_view(self):
+        # Set up track view
         self.setup_motor_frame()
-        self.mocap_frame()
+        self.setup_mocap_frame()
         self.setup_track_frame()
         self.setup_camera_frame()
-        self.setup_status_bar()
-        
-    def setup_gui(self):
-        self.dart.video_label = ctk.CTkLabel(self.window, text="")
-        self.dart.video_label.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=10)
-        self.dart.video_label.configure(image=self.dart.placeholder_image)
-        self.window.grid_rowconfigure(0, weight=1)  # Allow vertical expansion
-        self.window.grid_columnconfigure(0, weight=1)  # Allow horizontal expansion
+        self.setup_video_frame()
+
+    def setup_data_view(self):
+        pass
+
+    def switch_view(self, view):
+        if view == "track" and self.current_view != "track":
+            self.current_view = "track"
+
+            # Set up the track view
+            self.setup_track_view()
+        elif view == "data" and self.current_view != "data":
+            self.current_view = "data"
+            # Destroy the existing widgets in the track view if they exist
+            self.motor_frame.grid_forget()
+            self.mocap_frame.grid_forget()
+            self.track_frame.grid_forget()
+            self.camera_frame.grid_forget()
+            # Hide the video label
+            self.video_label.grid_forget()
+
+            # Set up the data analysis view
+            self.setup_data_view()
+
+    def setup_sidebar(self):
+        self.window.grid_columnconfigure(0, weight=0)  # Sidebar column
+
+        self.sidebar_frame = ctk.CTkFrame(self.window, width=50, corner_radius=0, border_width=-2, border_color="#1c1c1c")
+        self.sidebar_frame.grid(row=0, column=0, rowspan=5, sticky="nsw", padx=(0,5))
+        fg_color1 = self.sidebar_frame.cget("fg_color")
+
+        # Creating a thin frame to act as a stroke
+        stroke_frame = ctk.CTkFrame(self.sidebar_frame, width=3, height=50, fg_color="white", bg_color="white")
+        stroke_frame.pack(side="left", padx=(0, 0), pady=0, anchor="nw")  # Adjust padding for position
+
+        home_button = ctk.CTkButton(
+            self.sidebar_frame,
+            text="",
+            image=self.dart.home_icon,
+            height=50,
+            width=50,
+            corner_radius=0,
+            bg_color=fg_color1,
+            fg_color=fg_color1,
+            hover_color="#1c1c1c",
+            command=lambda: self.switch_view("track")  # Switch to track view when clicked
+        )
+        home_button.pack(side="top", padx=0, pady=0)
+
+        data_button = ctk.CTkButton(
+            self.sidebar_frame,
+            text="",
+            image=self.dart.data_icon,
+            height=50,
+            width=50,
+            corner_radius=0,
+            bg_color=fg_color1,
+            fg_color=fg_color1,
+            hover_color="#1c1c1c",
+            command=lambda: self.switch_view("data")  # Switch to data analysis view when clicked
+        )
+        data_button.pack(side="top", padx=0, pady=0)
+
+        # data_button.bind("<Button-1>", lambda event: command()) # bind command
+        data_button.pack(side="top", padx=0, pady=0)
+
+    def setup_video_frame(self):
+        self.video_label = ctk.CTkLabel(self.window, text="")
+        self.video_label.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=5, pady=5)
+        self.video_label.configure(image=self.dart.placeholder_image)
+
+        # Configure the row weights
+        self.window.grid_rowconfigure(0, weight=1)
+        # Configure the column weights
+        self.window.grid_columnconfigure(1, weight=1)
 
     def setup_motor_frame(self):
-        dyna_control_frame = ctk.CTkFrame(self.window)
-        dyna_control_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        self.window.grid_rowconfigure(0, weight=1)
+        self.motor_frame = ctk.CTkFrame(self.window)
+        self.motor_frame.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
         # Get available serial ports for combo box
         serial_ports = get_serial_ports()
 
         # Serial port frame
-        serial_frame = ctk.CTkFrame(dyna_control_frame)
+        serial_frame = ctk.CTkFrame(self.motor_frame)
         serial_frame.pack(side="top", padx=10, pady=10)
 
         # Combo box for selecting the COM port
@@ -50,7 +125,7 @@ class DARTGUI:
         self.dart.serial_refresh.pack(side="left", padx=5, pady=5)
 
         # Motor control sub-frame
-        control_frame = ctk.CTkFrame(dyna_control_frame, height = 2000)
+        control_frame = ctk.CTkFrame(self.motor_frame, height = 2000)
         control_frame.pack(side="top", padx=10, pady=10, fill="x", expand=True)
 
         # Frame for pan slider and label
@@ -72,7 +147,7 @@ class DARTGUI:
         self.dart.tilt_slider.pack(padx=5, pady=5)  # Packing inside tilt_frame is fine
 
         # Calibrate frame
-        self.dart.calibrate_frame = ctk.CTkFrame(dyna_control_frame)
+        self.dart.calibrate_frame = ctk.CTkFrame(self.motor_frame)
         self.dart.calibrate_frame.pack(side="top", padx=10, pady=10)
 
         # Create a calibration button
@@ -83,19 +158,18 @@ class DARTGUI:
                                            command=self.dart.centre, font=GLOBAL_FONT)
         self.dart.centre_button.pack(side="left", padx=10, pady=10)
 
-    def mocap_frame(self):
-        mocap_frame = ctk.CTkFrame(self.window)
-        mocap_frame.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
-        self.window.grid_columnconfigure(0, weight=1)
+    def setup_mocap_frame(self):
+        self.mocap_frame = ctk.CTkFrame(self.window)
+        self.mocap_frame.grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
 
         # Button to start/stop saving images
-        self.dart.mocap_button = ctk.CTkButton(mocap_frame, width=80, text="MoCap", image=self.dart.sync_icon, 
+        self.dart.mocap_button = ctk.CTkButton(self.mocap_frame, width=80, text="MoCap", image=self.dart.sync_icon, 
                                           command=self.dart.mocap_button_press, font=GLOBAL_FONT)
         self.dart.mocap_button.pack(side="top", pady=10)
 
         # Checkbox to enable/disable crosshair used to help with calibration
         self.dart.crosshair_checkbox = ctk.CTkCheckBox(
-            mocap_frame,
+            self.mocap_frame,
             text="Crosshair",
             variable=self.dart.show_crosshair,
             command=lambda: setattr(self.dart.image_pro, 'show_crosshair', self.dart.show_crosshair.get()),
@@ -106,27 +180,25 @@ class DARTGUI:
         self.dart.crosshair_checkbox.pack(side="top", pady=10, expand=True)
 
         # MoCap number of markers indicator
-        num_marker_frame = ctk.CTkFrame(mocap_frame)
+        num_marker_frame = ctk.CTkFrame(self.mocap_frame)
         num_marker_frame.pack(side="top", padx=10, pady=10, expand=True)
         self.dart.num_marker_label = ctk.CTkLabel(num_marker_frame, text="No. Markers: 0", font=GLOBAL_FONT)
         self.dart.num_marker_label.pack(padx=5, pady=5)
 
     def setup_track_frame(self):
-        track_frame = ctk.CTkFrame(self.window)
-        track_frame.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
-        self.window.grid_columnconfigure(0, weight=1)
+        self.track_frame = ctk.CTkFrame(self.window)
+        self.track_frame.grid(row=2, column=2, sticky="nsew", padx=5, pady=5)
 
         # Create a track button
-        self.dart.track_button = ctk.CTkButton(track_frame, text="Track", command=self.dart.track, font=GLOBAL_FONT)
+        self.dart.track_button = ctk.CTkButton(self.track_frame, text="Track", command=self.dart.track, font=GLOBAL_FONT)
         self.dart.track_button.pack(side="top", padx=10, pady=10, anchor="center", expand=True)
 
     def setup_camera_frame(self):
-        camera_control_frame = ctk.CTkFrame(self.window)
-        camera_control_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
-        self.window.grid_columnconfigure(0, weight=1)
+        self.camera_frame = ctk.CTkFrame(self.window)
+        self.camera_frame.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
 
         # Camera combo box frame
-        cam_frame = ctk.CTkFrame(camera_control_frame)
+        cam_frame = ctk.CTkFrame(self.camera_frame)
         cam_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
 
         # Dropdown combo box for selecting the camera
@@ -141,12 +213,12 @@ class DARTGUI:
         self.dart.cam_refresh.pack(side="left", padx=5, pady=5)
 
         # Button to start/stop live feed
-        self.dart.toggle_video_button = ctk.CTkButton(camera_control_frame, width=80, text="Start", image=self.dart.play_icon,
+        self.dart.toggle_video_button = ctk.CTkButton(self.camera_frame, width=80, text="Start", image=self.dart.play_icon,
                                                 command=self.dart.toggle_video_feed, font=GLOBAL_FONT)
         self.dart.toggle_video_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # Frame for exposure slider and label
-        exposure_frame = ctk.CTkFrame(camera_control_frame)
+        exposure_frame = ctk.CTkFrame(self.camera_frame)
         exposure_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
         self.dart.exposure_slider = ctk.CTkSlider(exposure_frame, width=140, from_=4, to=4000, command=self.dart.adjust_exposure)
         self.dart.exposure_slider.set(1000)
@@ -155,7 +227,7 @@ class DARTGUI:
         self.dart.exposure_label.pack()
 
         # Frame for gain slider and label
-        gain_frame = ctk.CTkFrame(camera_control_frame)
+        gain_frame = ctk.CTkFrame(self.camera_frame)
         gain_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
         self.dart.gain_slider = ctk.CTkSlider(gain_frame, width =140, from_=0, to=47, command=self.dart.adjust_gain)
         self.dart.gain_slider.set(10) 
@@ -164,7 +236,7 @@ class DARTGUI:
         self.dart.gain_label.pack()
 
         # Frame for video path and file name
-        video_path_frame = ctk.CTkFrame(camera_control_frame)
+        video_path_frame = ctk.CTkFrame(self.camera_frame)
         video_path_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
 
         # Button to open folder dialog
@@ -176,22 +248,22 @@ class DARTGUI:
         self.dart.file_name_entry.pack(side="left", padx=5, pady=5)
 
         # Button to start/stop recording
-        self.dart.record_button = ctk.CTkButton(camera_control_frame, width=90, text="Record", image=self.dart.record_icon, command=self.dart.toggle_record, font=GLOBAL_FONT)
+        self.dart.record_button = ctk.CTkButton(self.camera_frame, width=90, text="Record", image=self.dart.record_icon, command=self.dart.toggle_record, font=GLOBAL_FONT)
         self.dart.record_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # Button to pause recording
-        self.dart.pause_button = ctk.CTkButton(camera_control_frame, width=100, text="Pause", image=self.dart.pause_icon, command=self.dart.toggle_pause, state="disabled", font=GLOBAL_FONT)
+        self.dart.pause_button = ctk.CTkButton(self.camera_frame, width=100, text="Pause", image=self.dart.pause_icon, command=self.dart.toggle_pause, state="disabled", font=GLOBAL_FONT)
         self.dart.pause_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # FPS indicator display
-        fps_frame = ctk.CTkFrame(camera_control_frame)
+        fps_frame = ctk.CTkFrame(self.camera_frame)
         fps_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
         self.dart.fps_label = ctk.CTkLabel(fps_frame, text=f"FPS: {round(self.dart.camera_manager.fps, 2)}", font=GLOBAL_FONT)
         self.dart.fps_label.pack(padx=5, pady=5)
 
     def setup_status_bar(self):
-        self.dart.status_bar = ctk.CTkFrame(self.window, height=4, corner_radius=0, border_width=-2)
-        self.dart.status_bar.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=(15,0))
+        self.dart.status_bar = ctk.CTkFrame(self.window, height=4, corner_radius=0, border_width=-2, border_color="#1c1c1c")
+        self.dart.status_bar.grid(row=4, column=0, columnspan=3, sticky="nsew", pady=(5,0))
 
         # Add label to status bar
         self.dart.status_label = ctk.CTkLabel(self.dart.status_bar, text=self.dart.app_status, height=18, font=("default_theme", 14))

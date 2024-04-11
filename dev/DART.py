@@ -35,7 +35,7 @@ class DART:
         self.window.title("DART")
 
         # Set the minimum window size to the initial size
-        self.window.minsize(1300, 1000)
+        self.window.minsize(1480, 1040)
 
     def init_hardware(self):
         # Create an instance of ImageProcessor
@@ -69,15 +69,17 @@ class DART:
         self.detect_flag = tk.BooleanVar(value=False)
 
         # GUI icons/assets
-        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png").resize((96, 96)))
-        self.sync_icon = ctk.CTkImage(Image.open("dev/icons/sync.png").resize((96, 96)))
-        self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png").resize((96, 96)))
-        self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png").resize((96, 96)))
-        self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png").resize((96, 96)))
-        self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png").resize((96, 96)))
-        self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/icons/target.png").resize((96, 96)))
-        self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png").resize((96, 96)))
-        self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1008, 756), "black"), size=(1008, 756))
+        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png"), size=(24, 24))
+        self.sync_icon = ctk.CTkImage(Image.open("dev/icons/sync.png"), size=(24, 24))
+        self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png"), size=(24, 24))
+        self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png"), size=(24, 24))
+        self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png"), size=(24, 24))
+        self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png"), size=(24, 24))
+        self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/icons/target.png"), size=(24, 24))
+        self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png"), size=(24, 24))
+        self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1200, 900), "black"), size=(1200, 900))
+        self.home_icon = ctk.CTkImage(Image.open("dev/icons/track.png"), size=(40, 40))
+        self.data_icon = ctk.CTkImage(Image.open("dev/icons/data.png"), size=(40, 40))
 
         self.app_status = "Idle"
         self.file_name = None
@@ -291,7 +293,7 @@ class DART:
         img = ctk.CTkImage(img, size = (self.camera_manager.frame_width*(2/3), self.camera_manager.frame_height*(2/3)))
 
         # Update label with new image
-        self.video_label.configure(image=img)
+        self.gui.video_label.configure(image=img)
 
     def set_threshold(self, value: float):
         self.image_pro.threshold_value = int(value)
