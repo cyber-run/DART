@@ -1,6 +1,10 @@
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 import customtkinter as ctk
 from PIL import Image
+import numpy as np
 import serial
+
 
 
 GLOBAL_FONT = ("default_theme", 15)
@@ -21,7 +25,14 @@ class DARTGUI:
         self.setup_track_view()
 
     def setup_track_view(self):
-        # Set up track view
+        '''
+        Set up the track view
+        '''
+        # Configure the row weights
+        self.window.grid_rowconfigure(0, weight=1)
+        # Configure the column weights
+        self.window.grid_columnconfigure(1, weight=1)
+
         self.setup_motor_frame()
         self.setup_mocap_frame()
         self.setup_track_frame()
@@ -29,14 +40,25 @@ class DARTGUI:
         self.setup_video_frame()
 
     def setup_data_view(self):
-        pass
+        '''
+        Set up the data analysis view
+        '''
+        self.setup_video_frame2()
+        self.setup_plot_frame()
 
     def switch_view(self, view):
+        '''
+        Switch between the track view and data analysis view
+        '''
         if view == "track" and self.current_view != "track":
+            # Destroy the existing widgets in the data view if they exist
             self.current_view = "track"
+            self.video_label2.grid_forget()
+            self.plot_frame.grid_forget()
 
             # Set up the track view
             self.setup_track_view()
+            
         elif view == "data" and self.current_view != "data":
             self.current_view = "data"
             # Destroy the existing widgets in the track view if they exist
@@ -51,6 +73,9 @@ class DARTGUI:
             self.setup_data_view()
 
     def setup_sidebar(self):
+        '''
+        Set up the sidebar with buttons for switching between views
+        '''
         self.window.grid_columnconfigure(0, weight=0)  # Sidebar column
 
         self.sidebar_frame = ctk.CTkFrame(self.window, width=50, corner_radius=0, border_width=-2, border_color="#1c1c1c")
@@ -92,17 +117,54 @@ class DARTGUI:
         # data_button.bind("<Button-1>", lambda event: command()) # bind command
         data_button.pack(side="top", padx=0, pady=0)
 
+    def setup_video_frame2(self):
+        '''
+        Set up the video feed for the data view
+        '''
+        self.video_label2 = ctk.CTkLabel(self.window, text="")
+        self.video_label2.grid(row=0, column=1, rowspan=2, padx=5, pady=5)
+        self.video_label2.configure(image=self.dart.small_placeholder_image)
+    
+    def setup_plot_frame(self):
+        ''' 
+        Set up the plot frame for the data view
+        '''
+        self.plot_frame = ctk.CTkFrame(self.window, width=400, height=200)
+        self.plot_frame.grid(row=0, column=2, padx=5, pady=5)
+        self.plot_frame.pack_propagate(False)
+
+        # Generate random data for the plot
+        trajectory_plot_data = np.random.rand(100)
+        angle_plot_data = np.random.rand(100)
+
+        # Create a figure and axis for trajectory plot
+        trajectory_plot_fig, trajectory_plot_ax = plt.subplots()
+        trajectory_plot_ax.plot(trajectory_plot_data)
+
+        # Create a figure and axis for angle plot
+        angle_plot_fig, angle_plot_ax = plt.subplots()
+        angle_plot_ax.plot(angle_plot_data)
+
+        # Create a canvas for trajectory plot
+        trajectory_plot_canvas = FigureCanvasTkAgg(trajectory_plot_fig, self.plot_frame)
+        trajectory_plot_canvas.get_tk_widget().pack(side="top", fill="both", expand=True, anchor="n")
+
+        # Create a canvas for angle plot
+        angle_plot_canvas = FigureCanvasTkAgg(angle_plot_fig, self.plot_frame)
+        angle_plot_canvas.get_tk_widget().pack(side="top", fill="both", expand=True, anchor="center")
+
     def setup_video_frame(self):
+        '''
+        Set up the video feed for the track view
+        '''
         self.video_label = ctk.CTkLabel(self.window, text="")
         self.video_label.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=5, pady=5)
         self.video_label.configure(image=self.dart.placeholder_image)
 
-        # Configure the row weights
-        self.window.grid_rowconfigure(0, weight=1)
-        # Configure the column weights
-        self.window.grid_columnconfigure(1, weight=1)
-
     def setup_motor_frame(self):
+        '''
+        Set up the motor control frame for the track view
+        '''
         self.motor_frame = ctk.CTkFrame(self.window)
         self.motor_frame.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
@@ -126,23 +188,25 @@ class DARTGUI:
 
         # Motor control sub-frame
         control_frame = ctk.CTkFrame(self.motor_frame, height = 2000)
-        control_frame.pack(side="top", padx=10, pady=10, fill="x", expand=True)
+        control_frame.pack(side="top", padx=10, pady=10)
 
         # Frame for pan slider and label
-        pan_frame = ctk.CTkFrame(control_frame)
-        pan_frame.grid(row=0, column=0, padx=10, pady=10)
-        self.dart.pan_label = ctk.CTkLabel(pan_frame, text="Pan: 0°", font=GLOBAL_FONT, padx=5, pady=5)
+        pan_frame = ctk.CTkFrame(control_frame, width=80, height = 500)
+        pan_frame.grid(row=0, column=0, padx=0, pady=0)
+        pan_frame.pack_propagate(False)  # Prevents the frame from resizing to fit the label
+        self.dart.pan_label = ctk.CTkLabel(pan_frame, text="Pan: 0.0°", font=GLOBAL_FONT, padx=5, pady=5)
         self.dart.pan_label.pack()
-        self.dart.pan_slider = ctk.CTkSlider(pan_frame, from_=-45, to=45, command=self.dart.set_pan, orientation="vertical", height=400)
+        self.dart.pan_slider = ctk.CTkSlider(pan_frame, from_=-45, to=45, command=self.dart.set_pan, orientation="vertical", height=500)
         self.dart.pan_slider.set(self.dart.pan_value)
         self.dart.pan_slider.pack(padx=5, pady=5)
 
         # Frame for tilt slider and label
-        tilt_frame = ctk.CTkFrame(control_frame)
-        self.dart.tilt_label = ctk.CTkLabel(tilt_frame, text="Tilt: 0°", font=GLOBAL_FONT, padx=5, pady=5)
+        tilt_frame = ctk.CTkFrame(control_frame, width=80, height = 500)
+        tilt_frame.grid(row=0, column=1, padx=0, pady=0)  # Place it next to pan_frame using grid
+        tilt_frame.pack_propagate(False)  # Prevents the frame from resizing to fit the label
+        self.dart.tilt_label = ctk.CTkLabel(tilt_frame, text="Tilt: 0.0°", font=GLOBAL_FONT, padx=5, pady=5)
         self.dart.tilt_label.pack()
-        tilt_frame.grid(row=0, column=1, padx=10, pady=10)  # Place it next to pan_frame using grid
-        self.dart.tilt_slider = ctk.CTkSlider(tilt_frame, from_=-45, to=45, command=self.dart.set_tilt, orientation="vertical", height=400)
+        self.dart.tilt_slider = ctk.CTkSlider(tilt_frame, from_=-45, to=45, command=self.dart.set_tilt, orientation="vertical", height=500)
         self.dart.tilt_slider.set(self.dart.tilt_value)
         self.dart.tilt_slider.pack(padx=5, pady=5)  # Packing inside tilt_frame is fine
 
@@ -159,6 +223,9 @@ class DARTGUI:
         self.dart.centre_button.pack(side="left", padx=10, pady=10)
 
     def setup_mocap_frame(self):
+        '''
+        Set up the MoCap frame for the track view
+        '''
         self.mocap_frame = ctk.CTkFrame(self.window)
         self.mocap_frame.grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
 
@@ -186,6 +253,9 @@ class DARTGUI:
         self.dart.num_marker_label.pack(padx=5, pady=5)
 
     def setup_track_frame(self):
+        '''
+        Set up the track frame
+        '''
         self.track_frame = ctk.CTkFrame(self.window)
         self.track_frame.grid(row=2, column=2, sticky="nsew", padx=5, pady=5)
 
@@ -194,6 +264,9 @@ class DARTGUI:
         self.dart.track_button.pack(side="top", padx=10, pady=10, anchor="center", expand=True)
 
     def setup_camera_frame(self):
+        '''
+        Set up the camera frame for the track view
+        '''
         self.camera_frame = ctk.CTkFrame(self.window)
         self.camera_frame.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
 
@@ -262,6 +335,9 @@ class DARTGUI:
         self.dart.fps_label.pack(padx=5, pady=5)
 
     def setup_status_bar(self):
+        '''
+        Set up the status bar at the bottom of the window
+        '''
         self.dart.status_bar = ctk.CTkFrame(self.window, height=4, corner_radius=0, border_width=-2, border_color="#1c1c1c")
         self.dart.status_bar.grid(row=4, column=0, columnspan=3, sticky="nsew", pady=(5,0))
 

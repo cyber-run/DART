@@ -21,6 +21,7 @@ class DynaController:
         self.X_P_GAIN = 84              # P gain
         self.X_D_GAIN = 80              # D gain
         self.X_FF_2_GAIN = 88           # Feedforward 2 gain
+        self.I_GAIN = 82                # I gain
 
         # Protocol version : # X-series uses protocol version 2.0
         self.PROTOCOL_VERSION = 2.0
@@ -348,18 +349,20 @@ class DynaController:
 
         return op_mode
 
-    def set_gains(self, motor_id: int = 1, p_gain: int = 800, d_gain: int = 0, ff_2_gain: int = 0) -> None:
+    def set_gains(self, motor_id: int = 1, p_gain: int = 800, i_gain: int = 0, d_gain: int = 0, ff_2_gain: int = 0) -> None:
         '''
         Set servo motor gains.
 
         Parameters:
         - motor_id (int): ID of the motor.
         - p_gain (int): Proportional gain.
+        - i_gain (int): Integral gain.
         - d_gain (int): Derivative gain.
         - ff_2_gain (int): Feedforward 2 gain.
         '''
         self.write2ByteData(motor_id, self.X_P_GAIN, p_gain)
         self.write2ByteData(motor_id, self.X_D_GAIN, d_gain)
+        self.write2ByteData(motor_id, self.I_GAIN, i_gain)
         self.write2ByteData(motor_id, self.X_FF_2_GAIN, ff_2_gain)
 
     def get_gains(self, motor_id: int = 1) -> Dict[str, int]:
@@ -373,6 +376,7 @@ class DynaController:
         - Dict[str, int]: Dictionary containing the current PID gains.
         '''
         p_gain = self.read2ByteData(motor_id, self.X_P_GAIN)
+        i_gain = self.read2ByteData(motor_id, self.I_GAIN)
         d_gain = self.read2ByteData(motor_id, self.X_D_GAIN)
         ff_2_gain = self.read2ByteData(motor_id, self.X_FF_2_GAIN)
 
@@ -479,7 +483,7 @@ class DynaController:
     def close_port(self):
         self.port_handler.closePort()
 
-def get_curr_bode():
+def get_pwm_bode():
     set_realtime_priority()
 
     dyna = DynaController()
@@ -488,16 +492,16 @@ def get_curr_bode():
     dyna.set_op_mode(dyna.pan_id, 0)
     dyna.set_op_mode(dyna.tilt_id, 0)
 
-    dyna.set_gains(dyna.pan_id, 650, 1300, 1200)
-    dyna.set_gains(dyna.tilt_id, 1400, 500, 900)
+    # dyna.set_gains(dyna.pan_id, 650, 1300, 1200)
+    # dyna.set_gains(dyna.tilt_id, 1400, 500, 900)
 
     print(dyna.get_gains(dyna.pan_id))
     print(dyna.get_gains(dyna.tilt_id))
 
     # Set the frequency range for the Bode plot
     start_freq = 0.2
-    end_freq = 10
-    num_points = 30
+    end_freq = 5
+    num_points = 20
 
     frequencies = np.round(np.logspace(np.log10(start_freq), np.log10(end_freq), num_points), num_points)
 
@@ -556,16 +560,16 @@ def get_theta_bode():
     dyna.set_op_mode(dyna.pan_id, 3)
     dyna.set_op_mode(dyna.tilt_id, 3)
 
-    dyna.set_gains(dyna.pan_id, 650, 1300, 1200)
-    dyna.set_gains(dyna.tilt_id, 1400, 500, 900)
+    dyna.set_gains(dyna.pan_id, 2432, 720, 3200, 0)
+    dyna.set_gains(dyna.tilt_id, 2432, 720, 3200, 0)
 
     print(dyna.get_gains(dyna.pan_id))
     print(dyna.get_gains(dyna.tilt_id))
 
     # Set the frequency range for the Bode plot
     start_freq = 0.2
-    end_freq = 10
-    num_points = 30
+    end_freq = 5
+    num_points = 20
 
     frequencies = np.round(np.logspace(np.log10(start_freq), np.log10(end_freq), num_points), num_points)
 
@@ -647,4 +651,4 @@ def main2():
 if __name__ == "__main__":
     # main()
     get_theta_bode()
-    # get_curr_bode()
+    # get_pwm_bode()

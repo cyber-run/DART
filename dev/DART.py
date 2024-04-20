@@ -78,6 +78,7 @@ class DART:
         self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/icons/target.png"), size=(24, 24))
         self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png"), size=(24, 24))
         self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1200, 900), "black"), size=(1200, 900))
+        self.small_placeholder_image = ctk.CTkImage(Image.new("RGB", (300, 225), "black"), size=(800, 600))
         self.home_icon = ctk.CTkImage(Image.open("dev/icons/track.png"), size=(40, 40))
         self.data_icon = ctk.CTkImage(Image.open("dev/icons/data.png"), size=(40, 40))
 
@@ -369,7 +370,7 @@ class DART:
         if self.dyna is not None:
             value = round(value, 3)
             self.pan_value = value
-            self.pan_label.configure(text=f"Pan angle: {value}")
+            self.pan_label.configure(text=f"Pan: {round(value,1)}°")
             angle = num_to_range(self.pan_value, -45, 45, 202.5, 247.5)
             self.dyna.set_pos(1, angle)
         else:
@@ -379,7 +380,7 @@ class DART:
         if self.dyna is not None:
             value = round(value, 3)
             self.tilt_value = value
-            self.tilt_label.configure(text=f"Tilt angle: {value}")
+            self.tilt_label.configure(text=f"Tilt: {round(value,1)}°")
 
             # angle = num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
 
