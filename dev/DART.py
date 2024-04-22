@@ -22,6 +22,8 @@ import numpy as np
 class DART:
     def __init__(self, window: ctk.CTk):
         self.init_window(window)
+        self.window.bind("<Configure>", self.on_configure)
+
         self.init_hardware()
 
         self.init_params()
@@ -35,7 +37,8 @@ class DART:
         self.window.title("DART")
 
         # Set the minimum window size to the initial size
-        self.window.minsize(1480, 1040)
+        self.window.geometry("1440x1080")
+        self.window.minsize(1440, 1080)
 
     def init_hardware(self):
         # Create an instance of ImageProcessor
@@ -69,18 +72,18 @@ class DART:
         self.detect_flag = tk.BooleanVar(value=False)
 
         # GUI icons/assets
-        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png"), size=(24, 24))
-        self.sync_icon = ctk.CTkImage(Image.open("dev/icons/sync.png"), size=(24, 24))
-        self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png"), size=(24, 24))
-        self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png"), size=(24, 24))
-        self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png"), size=(24, 24))
-        self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png"), size=(24, 24))
-        self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/icons/target.png"), size=(24, 24))
-        self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png"), size=(24, 24))
+        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png"), size=(20, 20))
+        self.sync_icon = ctk.CTkImage(Image.open("dev/icons/sync.png"), size=(20, 20))
+        self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png"), size=(20, 20))
+        self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png"), size=(20, 20))
+        self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png"), size=(20, 20))
+        self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png"), size=(20, 20))
+        self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/icons/target.png"), size=(20, 20))
+        self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png"), size=(20, 20))
         self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1200, 900), "black"), size=(1200, 900))
         self.small_placeholder_image = ctk.CTkImage(Image.new("RGB", (300, 225), "black"), size=(800, 600))
-        self.home_icon = ctk.CTkImage(Image.open("dev/icons/track.png"), size=(40, 40))
-        self.data_icon = ctk.CTkImage(Image.open("dev/icons/data.png"), size=(40, 40))
+        self.home_icon = ctk.CTkImage(Image.open("dev/icons/track.png"), size=(30, 30))
+        self.data_icon = ctk.CTkImage(Image.open("dev/icons/data.png"), size=(30, 30))
 
         self.app_status = "Idle"
         self.file_name = None
@@ -103,7 +106,7 @@ class DART:
         self.memory_label.configure(text=f"Memory usage: {self.memory_usage}%")
 
         # Update memory usage at 0.2Hz
-        self.window.after(5000, self.get_mem)
+        self.mem_id = self.window.after(5000, self.get_mem)
 
     def test1(self):
         self.bridge.run_coroutine(self.qtm_control.start_recording())
@@ -397,6 +400,9 @@ class DART:
         self.tilt_slider.set(0)
 
     def on_closing(self):
+        # Cleanup GUI resources
+        self.gui.cleanup_resources()
+        
         try:
             # Close the camera
             self.is_live = False
@@ -448,6 +454,10 @@ class DART:
             
             self.video_path = path
 
+    def on_configure(self, e):
+        if e.widget == self.window:
+            time.sleep(0.01)
+
 def get_serial_ports() -> list:
     """Lists available serial ports.
 
@@ -457,6 +467,7 @@ def get_serial_ports() -> list:
     return [port.device for port in ports]
 
 if __name__ == "__main__":
+    ctk.set_default_color_theme("src/style.json")
     root = ctk.CTk()
     app = DART(root)
     # cProfile.run('app = DART(root)')

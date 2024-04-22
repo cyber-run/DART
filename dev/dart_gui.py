@@ -7,7 +7,7 @@ import serial
 
 
 
-GLOBAL_FONT = ("default_theme", 15)
+GLOBAL_FONT = ("default_theme", 14)
 
 class DARTGUI:
     def __init__(self, window, dart_instance):
@@ -32,17 +32,21 @@ class DARTGUI:
         self.window.grid_rowconfigure(0, weight=1)
         # Configure the column weights
         self.window.grid_columnconfigure(1, weight=1)
+        self.window.grid_columnconfigure(2, weight=0)
 
+        # self.setup_video_frame()
+        self.setup_video_frame()
         self.setup_motor_frame()
         self.setup_mocap_frame()
         self.setup_track_frame()
         self.setup_camera_frame()
-        self.setup_video_frame()
 
     def setup_data_view(self):
         '''
         Set up the data analysis view
         '''
+        # Configure the column weights
+        self.window.grid_columnconfigure(2, weight=1)
         self.setup_video_frame2()
         self.setup_plot_frame()
 
@@ -58,19 +62,23 @@ class DARTGUI:
 
             # Set up the track view
             self.setup_track_view()
+            self.home_button.configure(fg_color="#27272a")
+            self.data_button.configure(fg_color=self.fg_color1)
             
         elif view == "data" and self.current_view != "data":
             self.current_view = "data"
+            # Hide the video label
+            self.video_label.grid_forget()
             # Destroy the existing widgets in the track view if they exist
             self.motor_frame.grid_forget()
             self.mocap_frame.grid_forget()
             self.track_frame.grid_forget()
             self.camera_frame.grid_forget()
-            # Hide the video label
-            self.video_label.grid_forget()
 
             # Set up the data analysis view
             self.setup_data_view()
+            self.data_button.configure(fg_color="#27272a")
+            self.home_button.configure(fg_color=self.fg_color1)
 
     def setup_sidebar(self):
         '''
@@ -80,42 +88,33 @@ class DARTGUI:
 
         self.sidebar_frame = ctk.CTkFrame(self.window, width=50, corner_radius=0, border_width=-2, border_color="#1c1c1c")
         self.sidebar_frame.grid(row=0, column=0, rowspan=5, sticky="nsw", padx=(0,5))
-        fg_color1 = self.sidebar_frame.cget("fg_color")
+        self.fg_color1 = self.sidebar_frame.cget("fg_color")
 
-        # Creating a thin frame to act as a stroke
-        stroke_frame = ctk.CTkFrame(self.sidebar_frame, width=3, height=50, fg_color="white", bg_color="white")
-        stroke_frame.pack(side="left", padx=(0, 0), pady=0, anchor="nw")  # Adjust padding for position
-
-        home_button = ctk.CTkButton(
+        self.home_button = ctk.CTkButton(
             self.sidebar_frame,
             text="",
             image=self.dart.home_icon,
-            height=50,
-            width=50,
-            corner_radius=0,
-            bg_color=fg_color1,
-            fg_color=fg_color1,
+            height=40,
+            width=40,
+            corner_radius=5,
+            fg_color="#27272a",
             hover_color="#1c1c1c",
             command=lambda: self.switch_view("track")  # Switch to track view when clicked
         )
-        home_button.pack(side="top", padx=0, pady=0)
+        self.home_button.pack(side="top", padx=5, pady=5)
 
-        data_button = ctk.CTkButton(
+        self.data_button = ctk.CTkButton(
             self.sidebar_frame,
             text="",
             image=self.dart.data_icon,
-            height=50,
-            width=50,
-            corner_radius=0,
-            bg_color=fg_color1,
-            fg_color=fg_color1,
+            height=40,
+            width=40,
+            corner_radius=5,
+            fg_color=self.fg_color1,
             hover_color="#1c1c1c",
             command=lambda: self.switch_view("data")  # Switch to data analysis view when clicked
         )
-        data_button.pack(side="top", padx=0, pady=0)
-
-        # data_button.bind("<Button-1>", lambda event: command()) # bind command
-        data_button.pack(side="top", padx=0, pady=0)
+        self.data_button.pack(side="top", padx=5, pady=5)
 
     def setup_video_frame2(self):
         '''
@@ -129,29 +128,35 @@ class DARTGUI:
         ''' 
         Set up the plot frame for the data view
         '''
-        self.plot_frame = ctk.CTkFrame(self.window, width=400, height=200)
+        self.plot_frame = ctk.CTkFrame(self.window)
         self.plot_frame.grid(row=0, column=2, padx=5, pady=5)
-        self.plot_frame.pack_propagate(False)
+
+        # Use the dark background style
+        plt.style.use('dark_background')
 
         # Generate random data for the plot
-        trajectory_plot_data = np.random.rand(100)
-        angle_plot_data = np.random.rand(100)
+        trajectory_plot_data = np.random.rand(50)
+        angle_plot_data = np.random.rand(50)
 
         # Create a figure and axis for trajectory plot
-        trajectory_plot_fig, trajectory_plot_ax = plt.subplots()
+        trajectory_plot_fig, trajectory_plot_ax = plt.subplots(figsize=(5, 3))
         trajectory_plot_ax.plot(trajectory_plot_data)
+        trajectory_plot_fig.set_facecolor("none")
 
         # Create a figure and axis for angle plot
-        angle_plot_fig, angle_plot_ax = plt.subplots()
+        angle_plot_fig, angle_plot_ax = plt.subplots(figsize=(5, 3))
         angle_plot_ax.plot(angle_plot_data)
+        angle_plot_fig.set_facecolor("none")
 
         # Create a canvas for trajectory plot
         trajectory_plot_canvas = FigureCanvasTkAgg(trajectory_plot_fig, self.plot_frame)
-        trajectory_plot_canvas.get_tk_widget().pack(side="top", fill="both", expand=True, anchor="n")
+        trajectory_plot_canvas.get_tk_widget().configure(bg="#09090b")
+        trajectory_plot_canvas.get_tk_widget().pack(side="top", fill="both", expand=True, anchor="center", pady=20, padx=20)
 
         # Create a canvas for angle plot
         angle_plot_canvas = FigureCanvasTkAgg(angle_plot_fig, self.plot_frame)
-        angle_plot_canvas.get_tk_widget().pack(side="top", fill="both", expand=True, anchor="center")
+        angle_plot_canvas.get_tk_widget().configure(bg="#09090b")
+        angle_plot_canvas.get_tk_widget().pack(side="top", fill="both", expand=True, anchor="center", pady=20, padx=20)
 
     def setup_video_frame(self):
         '''
@@ -172,7 +177,7 @@ class DARTGUI:
         serial_ports = get_serial_ports()
 
         # Serial port frame
-        serial_frame = ctk.CTkFrame(self.motor_frame)
+        serial_frame = ctk.CTkFrame(self.motor_frame, fg_color="transparent")
         serial_frame.pack(side="top", padx=10, pady=10)
 
         # Combo box for selecting the COM port
@@ -187,11 +192,11 @@ class DARTGUI:
         self.dart.serial_refresh.pack(side="left", padx=5, pady=5)
 
         # Motor control sub-frame
-        control_frame = ctk.CTkFrame(self.motor_frame, height = 2000)
+        control_frame = ctk.CTkFrame(self.motor_frame, height = 2000, fg_color="transparent")
         control_frame.pack(side="top", padx=10, pady=10)
 
         # Frame for pan slider and label
-        pan_frame = ctk.CTkFrame(control_frame, width=80, height = 500)
+        pan_frame = ctk.CTkFrame(control_frame, width=80, height = 500, fg_color="transparent")
         pan_frame.grid(row=0, column=0, padx=0, pady=0)
         pan_frame.pack_propagate(False)  # Prevents the frame from resizing to fit the label
         self.dart.pan_label = ctk.CTkLabel(pan_frame, text="Pan: 0.0°", font=GLOBAL_FONT, padx=5, pady=5)
@@ -211,7 +216,7 @@ class DARTGUI:
         self.dart.tilt_slider.pack(padx=5, pady=5)  # Packing inside tilt_frame is fine
 
         # Calibrate frame
-        self.dart.calibrate_frame = ctk.CTkFrame(self.motor_frame)
+        self.dart.calibrate_frame = ctk.CTkFrame(self.motor_frame, fg_color="transparent")
         self.dart.calibrate_frame.pack(side="top", padx=10, pady=10)
 
         # Create a calibration button
@@ -247,7 +252,7 @@ class DARTGUI:
         self.dart.crosshair_checkbox.pack(side="top", pady=10, expand=True)
 
         # MoCap number of markers indicator
-        num_marker_frame = ctk.CTkFrame(self.mocap_frame)
+        num_marker_frame = ctk.CTkFrame(self.mocap_frame, fg_color="transparent")
         num_marker_frame.pack(side="top", padx=10, pady=10, expand=True)
         self.dart.num_marker_label = ctk.CTkLabel(num_marker_frame, text="No. Markers: 0", font=GLOBAL_FONT)
         self.dart.num_marker_label.pack(padx=5, pady=5)
@@ -271,7 +276,7 @@ class DARTGUI:
         self.camera_frame.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
 
         # Camera combo box frame
-        cam_frame = ctk.CTkFrame(self.camera_frame)
+        cam_frame = ctk.CTkFrame(self.camera_frame, fg_color="transparent")
         cam_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
 
         # Dropdown combo box for selecting the camera
@@ -291,7 +296,7 @@ class DARTGUI:
         self.dart.toggle_video_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # Frame for exposure slider and label
-        exposure_frame = ctk.CTkFrame(self.camera_frame)
+        exposure_frame = ctk.CTkFrame(self.camera_frame, fg_color="transparent")
         exposure_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
         self.dart.exposure_slider = ctk.CTkSlider(exposure_frame, width=140, from_=4, to=4000, command=self.dart.adjust_exposure)
         self.dart.exposure_slider.set(1000)
@@ -300,16 +305,16 @@ class DARTGUI:
         self.dart.exposure_label.pack()
 
         # Frame for gain slider and label
-        gain_frame = ctk.CTkFrame(self.camera_frame)
+        gain_frame = ctk.CTkFrame(self.camera_frame, fg_color="transparent")
         gain_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True, fill="x")
         self.dart.gain_slider = ctk.CTkSlider(gain_frame, width =140, from_=0, to=47, command=self.dart.adjust_gain)
         self.dart.gain_slider.set(10) 
         self.dart.gain_slider.pack(padx=5, pady=5, expand=True, fill="x")
-        self.dart.gain_label = ctk.CTkLabel(gain_frame, text="Gain: 10", font=GLOBAL_FONT)
+        self.dart.gain_label = ctk.CTkLabel(gain_frame, text="Gain (dB): 10", font=GLOBAL_FONT)
         self.dart.gain_label.pack()
 
         # Frame for video path and file name
-        video_path_frame = ctk.CTkFrame(self.camera_frame)
+        video_path_frame = ctk.CTkFrame(self.camera_frame, fg_color="transparent")
         video_path_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
 
         # Button to open folder dialog
@@ -329,7 +334,7 @@ class DARTGUI:
         self.dart.pause_button.pack(side="left", padx=10, anchor="center", expand=True)
 
         # FPS indicator display
-        fps_frame = ctk.CTkFrame(self.camera_frame)
+        fps_frame = ctk.CTkFrame(self.camera_frame, fg_color="transparent")
         fps_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
         self.dart.fps_label = ctk.CTkLabel(fps_frame, text=f"FPS: {round(self.dart.camera_manager.fps, 2)}", font=GLOBAL_FONT)
         self.dart.fps_label.pack(padx=5, pady=5)
@@ -363,6 +368,14 @@ class DARTGUI:
         self.dart.memory_label = ctk.CTkLabel(self.dart.status_bar, text=f"Memory usage: {self.dart.memory_usage}%", height=18, font=("default_theme", 14))
         self.dart.memory_label.pack(side="right", padx=10, pady=0, anchor="e", expand=False)
         self.dart.get_mem()
+
+    def cleanup_resources(self):
+        # Close and destroy all figures
+        plt.close('all')
+        
+        # Destroy all widgets
+        for widget in self.window.winfo_children():
+            widget.destroy()
 
 def get_serial_ports() -> list:
     """Lists available serial ports.
