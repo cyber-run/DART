@@ -1,9 +1,9 @@
 /venv38
 /__pycache__
 /dev/__pycache__
-/dev/videos/
+/dev/recordings
 /test/
-/src/
 /dev/output
 /calibration_images
 /calibration_data.npz
+/misc/

@@ -70,9 +70,6 @@ class CameraManager:
         while self.is_reading:
             ret, frame = self.cap.read()
             if ret:
-                # self.frame_counter += 1
-                # Flip frame verically
-                frame = cv2.flip(frame, 0)
                 self.latest_frame = frame
                 
     def start_recording(self, filename):
@@ -99,9 +96,6 @@ class CameraManager:
         while self.recording:
             logging.info("Capturing frame.")
             ret, frame = self.cap.read()
-
-            # Flip frame verically
-            frame = cv2.flip(frame, 0)
 
             if ret:
                 self.latest_frame = frame

@@ -481,6 +481,11 @@ class DynaController:
             self.set_sync_pos(pan_pos, tilt_pos)
 
     def close_port(self):
+        # Disable torque for both motors
+        self.set_torque(self.pan_id, False)
+        self.set_torque(self.tilt_id, False)
+
+        # Close port
         self.port_handler.closePort()
 
 def get_pwm_bode():

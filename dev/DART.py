@@ -2,12 +2,14 @@ import logging
 logging.basicConfig(level=logging.ERROR)
 
 from misc_funcs import num_to_range, set_realtime_priority
-import cProfile, time, cv2, os, asyncio, psutil
+from perf_timer import perf_counter_ns
+import cProfile, time, cv2, os, asyncio, psutil, signal
 from dyna_controller import DynaController
 from camera_manager import CameraManager
 from image_processor import ImageProcessor
 from CTkMessagebox import CTkMessagebox
-from multiprocessing import Process
+from multiprocessing import Process, Queue, Event
+from data_handler import DataHandler
 from dart_track import dart_track
 from calibrate import Calibrator
 import serial.tools.list_ports
@@ -64,26 +66,27 @@ class DART:
     def init_params(self):
         # Camera/image functionality
         self.is_live = False
-        self.video_path = "dev/videos"
+        self.video_path = "dev/recordings"
 
         # Image processing GUI flags
+        self.torque_flag = tk.BooleanVar(value=False)
         self.show_crosshair = tk.BooleanVar(value=False)
         self.threshold_flag = tk.BooleanVar(value=False)
         self.detect_flag = tk.BooleanVar(value=False)
 
         # GUI icons/assets
-        self.refresh_icon = ctk.CTkImage(Image.open("dev/icons/refresh.png"), size=(20, 20))
-        self.sync_icon = ctk.CTkImage(Image.open("dev/icons/sync.png"), size=(20, 20))
-        self.play_icon = ctk.CTkImage(Image.open("dev/icons/play.png"), size=(20, 20))
-        self.stop_icon = ctk.CTkImage(Image.open("dev/icons/stop.png"), size=(20, 20))
-        self.folder_icon = ctk.CTkImage(Image.open("dev/icons/folder.png"), size=(20, 20))
-        self.record_icon = ctk.CTkImage(Image.open("dev/icons/record.png"), size=(20, 20))
-        self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/icons/target.png"), size=(20, 20))
-        self.pause_icon = ctk.CTkImage(Image.open("dev/icons/pause.png"), size=(20, 20))
+        self.refresh_icon = ctk.CTkImage(Image.open("src/icons/refresh.png"), size=(20, 20))
+        self.sync_icon = ctk.CTkImage(Image.open("src/icons/sync.png"), size=(20, 20))
+        self.play_icon = ctk.CTkImage(Image.open("src/icons/play.png"), size=(20, 20))
+        self.stop_icon = ctk.CTkImage(Image.open("src/icons/stop.png"), size=(20, 20))
+        self.folder_icon = ctk.CTkImage(Image.open("src/icons/folder.png"), size=(20, 20))
+        self.record_icon = ctk.CTkImage(Image.open("src/icons/record.png"), size=(20, 20))
+        self.qtm_stream_icon = ctk.CTkImage(Image.open("src/icons/target.png"), size=(20, 20))
+        self.pause_icon = ctk.CTkImage(Image.open("src/icons/pause.png"), size=(20, 20))
         self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1200, 900), "black"), size=(1200, 900))
         self.small_placeholder_image = ctk.CTkImage(Image.new("RGB", (300, 225), "black"), size=(800, 600))
-        self.home_icon = ctk.CTkImage(Image.open("dev/icons/track.png"), size=(30, 30))
-        self.data_icon = ctk.CTkImage(Image.open("dev/icons/data.png"), size=(30, 30))
+        self.home_icon = ctk.CTkImage(Image.open("src/icons/track.png"), size=(30, 30))
+        self.data_icon = ctk.CTkImage(Image.open("src/icons/data.png"), size=(30, 30))
 
         self.app_status = "Idle"
         self.file_name = None
@@ -125,12 +128,10 @@ class DART:
 
     def track(self):
         if self.track_process is not None:
-            self.track_process.terminate()
+            self.terminate_event.set()
             self.track_process.join()
             self.track_process = None
-
             self.connect_dyna_controller()
-
             self.track_button.configure(text="Track", image=self.play_icon)
             return
         
@@ -142,8 +143,14 @@ class DART:
             # Close serial port
             self.dyna.close_port()
 
-            self.track_process = Process(target=dart_track)
+            # Create instance of queue for retrieving data
+            self.data_queue = Queue(maxsize=1)
+
+            # Create and start the tracking process
+            self.terminate_event = Event()
+            self.track_process = Process(target=dart_track, args=(self.data_queue, self.terminate_event))
             self.track_process.start()
+
             self.track_process.pid
 
             self.track_button.configure(text="Stop", image=self.stop_icon)
@@ -175,14 +182,28 @@ class DART:
 
             # Set the file name to a default value if it's empty
             if file_name:
-                file_name = f"{file_name}_{timestamp}.mp4"
+                video_name = f"{file_name}_{timestamp}.mp4"
+                data_name = f"{file_name}_{timestamp}.parquet"
             else:
-                file_name = f"video_{timestamp}.mp4"
-            filename = os.path.join(self.video_path, file_name)
+                video_name = f"video_{timestamp}.mp4"
+                data_name = f"data_{timestamp}.parquet"
+
+            video_path = os.path.join(self.video_path, video_name)
+            data_path = os.path.join(self.video_path, data_name)
             
             # Start recording
-            self.camera_manager.start_recording(filename)
-            if self.qtm_control is not None: self.bridge.run_coroutine(self.qtm_control.start_recording())
+            self.camera_manager.start_recording(video_path)
+            self.record_start_ms = perf_counter_ns() * 1e-6
+            self.data_handler = DataHandler(self.data_queue, 
+                                            batch_size=1000, 
+                                            output_dir=self.video_path, 
+                                            start_time = self.record_start_ms)
+            
+            _ = self.data_queue.get() # Clear the queue
+            self.data_handler.start(data_path)
+
+            # Synced recording with QTM
+            # if self.qtm_control is not None: self.bridge.run_coroutine(self.qtm_control.start_recording())
 
             # Update the record button to show that recording is in progress
             self.record_button.configure(text="Stop", image=self.stop_icon)
@@ -194,7 +215,9 @@ class DART:
         else:
             # Stop recording
             self.camera_manager.stop_recording()
-            if self.qtm_control is not None: self.bridge.run_coroutine(self.qtm_control.stop_recording())
+            self.data_handler.stop()  # Stop the DataHandler
+
+            # if self.qtm_control is not None: self.bridge.run_coroutine(self.qtm_control.stop_recording())
 
             if self.camera_manager.is_paused:
                 self.pause_button.configure(text="Pause", state="disabled", image=self.pause_icon)
@@ -320,13 +343,16 @@ class DART:
                 self.dyna = DynaController(com_port=selected_port)
                 self.dyna.open_port()
 
-                self.dyna.set_gains(1, 650, 1300, 1200)
-                self.dyna.set_gains(2, 1400, 500, 900)
+                self.dyna.set_gains(self.dyna.pan_id, 2432, 720, 3200, 0)
+                self.dyna.set_gains(self.dyna.tilt_id, 2432, 720, 3200, 0)
 
                 self.dyna.set_op_mode(1, 3)  # Pan to position control
                 self.dyna.set_op_mode(2, 3)  # Tilt to position control
 
-                self.dyna.set_sync_pos(225, 135)
+                self.dyna.set_sync_pos(45, 45)
+
+                self.dyna.set_torque(self.dyna.pan_id, self.torque_flag.get())
+                self.dyna.set_torque(self.dyna.tilt_id, self.torque_flag.get())
                 
                 logging.info(f"Connected to Dynamixel controller on {selected_port}.")
             else:
@@ -369,12 +395,19 @@ class DART:
             logging.error(f"Error connecting to QTM: {e}")
             self.qtm_stream = None
 
+    def set_torque(self):
+        if self.dyna is not None:
+            self.dyna.set_torque(self.dyna.pan_id, self.torque_flag.get())
+            self.dyna.set_torque(self.dyna.tilt_id, self.torque_flag.get())
+        else:
+            logging.error("Dynamixel controller not connected.")
+
     def set_pan(self, value: float):
         if self.dyna is not None:
             value = round(value, 3)
             self.pan_value = value
             self.pan_label.configure(text=f"Pan: {round(value,1)}°")
-            angle = num_to_range(self.pan_value, -45, 45, 202.5, 247.5)
+            angle = num_to_range(self.pan_value, -45, 45, 22.5, 67.5)
             self.dyna.set_pos(1, angle)
         else:
             logging.error("Dynamixel controller not connected.")
@@ -388,7 +421,7 @@ class DART:
             # angle = num_to_range(self.tilt_value, -45, 45, 292.5, 337.5)
 
             # Reverse tilt mapping direction
-            angle = num_to_range(self.tilt_value, 45, -45, 112.5, 157.5)
+            angle = num_to_range(self.tilt_value, -45, 45, 22.5, 67.5)
             self.dyna.set_pos(2, angle)
         else:
             logging.error("Dynamixel controller not connected.")
@@ -439,8 +472,8 @@ class DART:
         # Terminate subprocess
         if self.track_process is not None and hasattr(self, 'track_process') and self.track_process.is_alive():
             try:
-                self.track_process.terminate()
-                self.track_process.join()  # Wait for the process to terminate
+                self.terminate_event.set()
+                self.track_process.join()
             except Exception as e:
                 logging.error(f"Error terminating track process: {e}")
 

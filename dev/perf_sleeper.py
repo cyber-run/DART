@@ -30,7 +30,7 @@ class PerfSleeper:
 if __name__ == "__main__":
     try:
         while True:
-            ms_time = 2  # 1ms
+            ms_time = 1  # 1ms
             # Original time.sleep()
             start_time = time.perf_counter()
             time.sleep(ms_time / 1000)

@@ -191,6 +191,17 @@ class DARTGUI:
                                             image=self.dart.refresh_icon, command=self.dart.update_serial_ports_dropdown)
         self.dart.serial_refresh.pack(side="left", padx=5, pady=5)
 
+        # Checkbox to enable/disable motor torque
+        self.dart.torque_checkbox = ctk.CTkCheckBox(
+            self.motor_frame,
+            text="Torque",
+            variable=self.dart.torque_flag,
+            command=self.dart.set_torque,
+            onvalue=True,
+            offvalue=False
+        )
+        self.dart.torque_checkbox.pack(side="top", pady=10, expand=False)
+
         # Motor control sub-frame
         control_frame = ctk.CTkFrame(self.motor_frame, height = 2000, fg_color="transparent")
         control_frame.pack(side="top", padx=10, pady=10)

@@ -1,6 +1,7 @@
 from threading import Thread, Event
 from queue import Queue, Empty
 import time
+from perf_timer import perf_counter_ns
 import random
 import pandas as pd
 import pyarrow as pa
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 class DataHandler:
-    def __init__(self, queue: Queue, batch_size: int = 1000, output_dir: str = "output"):
+    def __init__(self, queue: Queue, batch_size: int = 1000, output_dir: str = "output", start_time = None):
         """
         Initializes the DataHandler with a queue, batch size, and output directory.
         """
@@ -20,14 +21,20 @@ class DataHandler:
         self.batch_number = 0
         self.thread = None
         self.stop_event = Event()
-        self.start_time = None  # Renamed for consistency
+        self.start_time_ms = start_time  # Renamed for consistency
+        self.merged_file_path = None
 
-    def start(self):
+    def start(self, output_file: str = "merged_data.parquet"):
         """
         Starts the data handling thread.
         """
+        self.merged_file_path = output_file
+
         self.stop_event.clear()
-        self.start_time = time.perf_counter_ns() * 1e-6  # Start time in milliseconds
+
+        if self.start_time_ms is None:
+            self.start_time_ms = perf_counter_ns() * 1e-6  # Start time in milliseconds
+
         self.thread = Thread(target=self._handle_data)
         self.thread.start()
 
@@ -37,6 +44,7 @@ class DataHandler:
         """
         self.stop_event.set()
         self.thread.join()
+        self.merge_parquet_files()
 
     def _handle_data(self):
         """
@@ -67,21 +75,20 @@ class DataHandler:
             return
 
         filename = self.output_dir / f"data_batch_{self.batch_number}.parquet"
-        columns = ['desired_pan', 'desired_tilt', 'actual_pan', 'actual_tilt', 'timestamp']
+        columns = ['target position', 'desired_pan', 'desired_tilt', 'encoder_pan', 'encoder_tilt', 'time_stamp_ms']
         df = pd.DataFrame(data_batch, columns=columns)
 
         # Adjust the timestamp for the whole column
-        df['timestamp'] = df['timestamp'] - self.start_time
+        df['time_stamp_ms'] = df['time_stamp_ms'] - self.start_time_ms
 
         table = pa.Table.from_pandas(df, preserve_index=False)
         pq.write_table(table, filename)
         self.batch_number += 1
 
-    def merge_parquet_files(self, output_file: str = "merged_data.parquet"):
+    def merge_parquet_files(self):
         """
         Merges individual batch Parquet files into a larger Parquet file.
         """
-        output_file_path = self.output_dir / output_file
         parquet_files = list(self.output_dir.glob("data_batch_*.parquet"))
 
         if not parquet_files:
@@ -90,9 +97,9 @@ class DataHandler:
 
         tables = [pq.read_table(file) for file in parquet_files]
         combined_table = pa.concat_tables(tables)
-        pq.write_table(combined_table, output_file_path)
+        pq.write_table(combined_table, self.merged_file_path)
 
-        print(f"Merged {len(parquet_files)} files into {output_file_path}.")
+        print(f"Merged {len(parquet_files)} files into {self.merged_file_path}.")
 
         for file in parquet_files:
             file.unlink()
@@ -104,9 +111,9 @@ def add_test_data(queue: Queue, control_event: Event):
     while control_event.is_set():
         data = (random.randint(1, 100), random.randint(1, 100),
                 random.randint(1, 100), random.randint(1, 100),
-                time.perf_counter_ns() * 1e-6)
+                perf_counter_ns() * 1e-6)
         queue.put(data)
-        time.sleep(0.0001)
+        # time.sleep(0.0001)
 
 # Example usage
 if __name__ == "__main__":
@@ -119,11 +126,11 @@ if __name__ == "__main__":
     data_gen_thread.start()
 
     # Create and manage the DataHandler to process and write the data
-    data_handler = DataHandler(queue, batch_size=1000, output_dir="output")
+    data_handler = DataHandler(queue, batch_size=1000, output_dir="dev\data")
     data_handler.start()
 
     # Example: run for 10 seconds, then stop
-    time.sleep(3)
+    time.sleep(5)
     control_event.clear()  # Stop data generation
     data_handler.stop()  # Stop the DataHandler
     data_handler.merge_parquet_files("final_merged_data.parquet")
