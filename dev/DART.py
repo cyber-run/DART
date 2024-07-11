@@ -56,10 +56,7 @@ class DART:
         self.selected_camera = ctk.StringVar(value="")
         
         # Initialize QTM and Dynamixel controller objects
-        self.qtm_control = None
         self.qtm_stream = None
-        loop = asyncio.new_event_loop()
-        self.bridge = TkinterAsyncioBridge(loop)
 
         self.dyna = None
 
@@ -110,16 +107,6 @@ class DART:
 
         # Update memory usage at 0.2Hz
         self.mem_id = self.window.after(5000, self.get_mem)
-
-    def test1(self):
-        self.bridge.run_coroutine(self.qtm_control.start_recording())
-
-    def test2(self):
-        self.bridge.run_coroutine(self.qtm_control.stop_recording())
-
-    def test3(self):
-        timestamp = time.strftime("%Y%m%dT%H%M%S")
-        self.bridge.run_coroutine(self.qtm_control.set_qtm_event(timestamp))
 
     def calibrate(self):
         p1 = np.array(self.qtm_stream.position)
@@ -199,11 +186,11 @@ class DART:
                                             output_dir=self.video_path, 
                                             start_time = self.record_start_ms)
             
-            _ = self.data_queue.get() # Clear the queue
-            self.data_handler.start(data_path)
+            # Check for old value stored in queue and clear it
+            if self.data_queue.full():
+                _ = self.data_queue.get() # Clear the queue
 
-            # Synced recording with QTM
-            # if self.qtm_control is not None: self.bridge.run_coroutine(self.qtm_control.start_recording())
+            self.data_handler.start(data_path)
 
             # Update the record button to show that recording is in progress
             self.record_button.configure(text="Stop", image=self.stop_icon)
@@ -216,8 +203,6 @@ class DART:
             # Stop recording
             self.camera_manager.stop_recording()
             self.data_handler.stop()  # Stop the DataHandler
-
-            # if self.qtm_control is not None: self.bridge.run_coroutine(self.qtm_control.stop_recording())
 
             if self.camera_manager.is_paused:
                 self.pause_button.configure(text="Pause", state="disabled", image=self.pause_icon)
@@ -238,10 +223,6 @@ class DART:
             file_name = f"video_{timestamp}.mp4"
             filename = os.path.join(self.video_path, file_name)
             self.camera_manager.start_recording(filename)
-            
-            resumed_event_name = f"{timestamp}Resumed"
-            if self.qtm_control is not None:
-                self.bridge.run_coroutine(self.qtm_control.set_qtm_event(resumed_event_name))
 
             # Set the callback function to be executed when the writing thread finishes
             self.camera_manager.set_on_write_finished(self.on_write_finished)
@@ -250,10 +231,6 @@ class DART:
             # Pause recording and stop the current video file
             self.camera_manager.is_paused = True
             self.camera_manager.stop_recording()
-            
-            paused_event_name = "Paused"
-            if self.qtm_control is not None:
-                self.bridge.run_coroutine(self.qtm_control.set_qtm_event(paused_event_name))
             
             self.pause_button.configure(text="Saving", state="disabled")
 
@@ -386,10 +363,6 @@ class DART:
             self.qtm_stream = QTMStream()
             self.qtm_stream.calibration_target = True
 
-            self.qtm_control = QTMControl()
-
-            # Start the asyncio event loop for the bridge
-            self.bridge.start()
             logging.info("Connected to QTM.")
         except Exception as e:
             logging.error(f"Error connecting to QTM: {e}")
@@ -454,11 +427,6 @@ class DART:
                 asyncio.run_coroutine_threadsafe(self.qtm_stream._close(), asyncio.get_event_loop())
                 self.qtm_stream.close()
 
-            if self.qtm_control is not None:
-                asyncio.run_coroutine_threadsafe(self.qtm_control._close(), asyncio.get_event_loop())
-                self.qtm_control.close()
-
-            self.bridge.stop()
         except Exception as e:
             logging.info(f"Error closing QTM connection: {e}")
 

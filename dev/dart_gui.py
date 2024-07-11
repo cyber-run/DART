@@ -1,9 +1,10 @@
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 import customtkinter as ctk
+from CTkMenuBar import *
 from PIL import Image
 import numpy as np
-import serial
+import serial, os
 
 
 
@@ -20,6 +21,7 @@ class DARTGUI:
         # Set up persistent GUI elements
         self.setup_sidebar()
         self.setup_status_bar()
+        self.setup_menu_bar()
 
         # Set up track view
         self.setup_track_view()
@@ -79,6 +81,19 @@ class DARTGUI:
             self.setup_data_view()
             self.data_button.configure(fg_color="#27272a")
             self.home_button.configure(fg_color=self.fg_color1)
+
+    def setup_menu_bar(self):
+        '''
+        Set up the menu bar
+        '''
+        # Create the title menu if windows else create menu bar
+        title_menu = CTkTitleMenu(self.window) if os.name == "nt" else CTkMenuBar(self.window)
+
+        file_menu = title_menu.add_cascade(text="File")
+        file_dropdown = CustomDropdownMenu(widget=file_menu)
+        file_dropdown.add_option(option="Track", command=self.dart.track)
+        file_dropdown.add_separator()
+        file_dropdown.add_option(option="Exit", command=self.dart.on_closing)
 
     def setup_sidebar(self):
         '''

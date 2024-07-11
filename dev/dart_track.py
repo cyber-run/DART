@@ -83,6 +83,13 @@ class DynaTracker:
     # Create a function that takes distance as input and returns steps
     def distance_to_steps(self, distance: float) -> int:
         steps = int(np.polyval(self.coefficients, distance))
+
+        # Check if the steps are within the limits
+        if steps > 65535:
+            steps = 65535
+        elif steps < 0:
+            steps = 0
+            
         return steps
 
     def track(self):
@@ -93,12 +100,12 @@ class DynaTracker:
         
         self.target_pos = self.target.position
 
-        distance = np.linalg.norm(self.target_pos - self.mean_origin)/1000
+        distance = (np.linalg.norm(self.target_pos - self.mean_origin)/1000)
 
         # Check if the distance has changed significantly
         # If it has, move the Theia to the new distance and save dist val to object
         if abs(distance - self.dist) > 0.1:
-            steps = self.distance_to_steps(distance)
+            steps = (self.distance_to_steps(distance)-35000)
             print(f"Distance: {distance} Steps: {steps}")
             # self.theia._wait_till_status_change(1, self.theia.FOCUS_MOVE)
             steps = max(0, steps)

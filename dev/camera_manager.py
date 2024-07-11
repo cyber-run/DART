@@ -78,7 +78,8 @@ class CameraManager:
             "-input_framerate": 30,
             "-r" : 30,
             "-preset": "ultrafast",
-            "-crf": 18
+            "-crf": 18,
+            "-ffmpeg_download_path": "src/ffmpeg"
         }
 
         # Define writer with defined parameters and suitable output filename for e.g. `Output.mp4
