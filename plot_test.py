@@ -73,7 +73,10 @@ class DataVisualizer:
         self.file_path = filedialog.askopenfilename(filetypes=[("Parquet files", "*.parquet")])
         if self.file_path:
             base_name = self.file_path.split("/")[-1].replace("data_", "").replace(".parquet", "")
-            self.video_path = f"{self.file_path.rsplit('/', 1)[0]}/video_{base_name}.mp4"
+            self.video_path = f"{self.file_path.rsplit('/', 1)[0]}/{base_name}.mp4"
+
+            print(f"Data file name: {base_name + '.parquet'}")
+            print(f"Video file name: {self.video_path}")
 
             if self.video_path:
                 cap = cv2.VideoCapture(self.video_path)

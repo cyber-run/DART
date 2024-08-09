@@ -56,11 +56,12 @@ class DynaTracker:
         self.theia.initialise()
 
         # Define the data points
-        distance_data = np.array([0.8, 1.43, 2.2, 2.87, 4.09, 5.29])
-        steps_data = np.array([38496, 40592, 42026, 43168, 43648, 44032])
+        distance_data = np.array([0.68, 1.05, 1.61, 1.110, 0.699])
+        steps_data = np.array([0, 2000, 6000, 4000, 0])
 
         # Fit a polynomial curve (degree 2) to the data
-        self.coefficients = np.polyfit(distance_data, steps_data, 3)
+        self.coefficients = np.polyfit(distance_data, steps_data, 2)
+        # fit linear curve to the data
         self.dist = 0
 
         self.counter = 0
@@ -105,7 +106,7 @@ class DynaTracker:
         # Check if the distance has changed significantly
         # If it has, move the Theia to the new distance and save dist val to object
         if abs(distance - self.dist) > 0.1:
-            steps = (self.distance_to_steps(distance)-35000)
+            steps = (self.distance_to_steps(distance))
             print(f"Distance: {distance} Steps: {steps}")
             # self.theia._wait_till_status_change(1, self.theia.FOCUS_MOVE)
             steps = max(0, steps)

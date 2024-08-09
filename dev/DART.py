@@ -294,7 +294,8 @@ class DART:
         img = Image.fromarray(img)
 
         # Convert to tk img
-        img = ctk.CTkImage(img, size = (self.camera_manager.frame_width*(2/3), self.camera_manager.frame_height*(2/3)))
+        # img = ctk.CTkImage(img, size = (self.camera_manager.frame_width*(2/3), self.camera_manager.frame_height*(2/3)))
+        img = ctk.CTkImage(img, size = (self.camera_manager.frame_width, self.camera_manager.frame_height))
 
         # Update label with new image
         self.gui.video_label.configure(image=img)
