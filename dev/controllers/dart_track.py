@@ -1,10 +1,10 @@
-from misc_funcs import set_realtime_priority, num_to_range
+from utils.misc_funcs import set_realtime_priority, num_to_range
 import logging, pickle, time, os, cProfile, asyncio, signal
-from perf_timer import perf_counter_ns
+from utils.perf_timer import perf_counter_ns
 from dyna_controller import *
 from importlib import reload
-from TheiaControl import TheiaController
-from qtm_mocap import *
+from theia_controller import TheiaController
+from dev.controllers.qtm_mocap import *
 import numpy as np
 import queue
 

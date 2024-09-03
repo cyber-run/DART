@@ -47,13 +47,12 @@
 
 - [x] Get a bigger hard drive
 
-- [ ] Log position readings
+- [x] Log position readings
+
+- [x] CHECK MOTOR SETTINGS ie pwm ramp
+
+- [x] Link mocap control and all recording functions together
 
 - [ ] Cancel recording
 
 - [ ] take the mean of multiple markers
-
-- [ ] CHECK MOTOR SETTINGS ie pwm ramp
-
-- [ ] Link mocap control and all recording functions together
-

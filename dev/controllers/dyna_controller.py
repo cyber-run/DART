@@ -1,5 +1,5 @@
 import threading, time, math, logging, cProfile
-from misc_funcs import set_realtime_priority
+from utils.misc_funcs import set_realtime_priority
 from typing import Dict, Tuple
 from dynamixel_sdk import *
 import numpy as np

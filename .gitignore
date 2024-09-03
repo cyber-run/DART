@@ -7,4 +7,6 @@
 /calibration_images
 /calibration_data.npz
 /misc/
-/src/ffmpeg/
+/static/ffmpeg/
+/yolo_test
+/local

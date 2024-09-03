@@ -1,24 +1,25 @@
 import logging
 logging.basicConfig(level=logging.ERROR)
 
-from misc_funcs import num_to_range, set_realtime_priority
-from perf_timer import perf_counter_ns
+from utils.misc_funcs import num_to_range
+from utils.perf_timer import perf_counter_ns
 import cProfile, time, cv2, os, asyncio, psutil, signal
-from dyna_controller import DynaController
-from camera_manager import CameraManager
-from image_processor import ImageProcessor
+from controllers.dyna_controller import DynaController
+from models.camera_manager import CameraManager
+from dev.controllers.image_processor import ImageProcessor
 from CTkMessagebox import CTkMessagebox
 from multiprocessing import Process, Queue, Event
-from data_handler import DataHandler
-from dart_track import dart_track
-from calibrate import Calibrator
+from models.data_handler import DataHandler
+from controllers.dart_track import dart_track
+from controllers.calibrate import Calibrator
 import serial.tools.list_ports
 import customtkinter as ctk
-from dart_gui import DARTGUI
-from qtm_mocap import *
+from dev.views.dart_gui import DARTGUI
+from dev.controllers.qtm_mocap import *
 from PIL import Image
 import tkinter as tk
 import numpy as np
+
 
 
 class DART:

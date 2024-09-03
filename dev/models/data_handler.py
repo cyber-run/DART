@@ -1,7 +1,7 @@
 from threading import Thread, Event
 from queue import Queue, Empty
 import time
-from perf_timer import perf_counter_ns
+from utils.perf_timer import perf_counter_ns
 import random
 import pandas as pd
 import pyarrow as pa
