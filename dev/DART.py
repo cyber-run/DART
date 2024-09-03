@@ -6,7 +6,7 @@ from utils.perf_timer import perf_counter_ns
 import cProfile, time, cv2, os, asyncio, psutil, signal
 from controllers.dyna_controller import DynaController
 from models.camera_manager import CameraManager
-from dev.controllers.image_processor import ImageProcessor
+from controllers.image_processor import ImageProcessor
 from CTkMessagebox import CTkMessagebox
 from multiprocessing import Process, Queue, Event
 from models.data_handler import DataHandler
@@ -14,8 +14,8 @@ from controllers.dart_track import dart_track
 from controllers.calibrate import Calibrator
 import serial.tools.list_ports
 import customtkinter as ctk
-from dev.views.dart_gui import DARTGUI
-from dev.controllers.qtm_mocap import *
+from views.dart_gui import DARTGUI
+from controllers.qtm_mocap import *
 from PIL import Image
 import tkinter as tk
 import numpy as np
@@ -73,18 +73,18 @@ class DART:
         self.detect_flag = tk.BooleanVar(value=False)
 
         # GUI icons/assets
-        self.refresh_icon = ctk.CTkImage(Image.open("src/icons/refresh.png"), size=(20, 20))
-        self.sync_icon = ctk.CTkImage(Image.open("src/icons/sync.png"), size=(20, 20))
-        self.play_icon = ctk.CTkImage(Image.open("src/icons/play.png"), size=(20, 20))
-        self.stop_icon = ctk.CTkImage(Image.open("src/icons/stop.png"), size=(20, 20))
-        self.folder_icon = ctk.CTkImage(Image.open("src/icons/folder.png"), size=(20, 20))
-        self.record_icon = ctk.CTkImage(Image.open("src/icons/record.png"), size=(20, 20))
-        self.qtm_stream_icon = ctk.CTkImage(Image.open("src/icons/target.png"), size=(20, 20))
-        self.pause_icon = ctk.CTkImage(Image.open("src/icons/pause.png"), size=(20, 20))
+        self.refresh_icon = ctk.CTkImage(Image.open("dev/assets/icons/refresh.png"), size=(20, 20))
+        self.sync_icon = ctk.CTkImage(Image.open("dev/assets/icons/sync.png"), size=(20, 20))
+        self.play_icon = ctk.CTkImage(Image.open("dev/assets/icons/play.png"), size=(20, 20))
+        self.stop_icon = ctk.CTkImage(Image.open("dev/assets/icons/stop.png"), size=(20, 20))
+        self.folder_icon = ctk.CTkImage(Image.open("dev/assets/icons/folder.png"), size=(20, 20))
+        self.record_icon = ctk.CTkImage(Image.open("dev/assets/icons/record.png"), size=(20, 20))
+        self.qtm_stream_icon = ctk.CTkImage(Image.open("dev/assets/icons/target.png"), size=(20, 20))
+        self.pause_icon = ctk.CTkImage(Image.open("dev/assets/icons/pause.png"), size=(20, 20))
         self.placeholder_image = ctk.CTkImage(Image.new("RGB", (1200, 900), "black"), size=(1200, 900))
         self.small_placeholder_image = ctk.CTkImage(Image.new("RGB", (300, 225), "black"), size=(800, 600))
-        self.home_icon = ctk.CTkImage(Image.open("src/icons/track.png"), size=(30, 30))
-        self.data_icon = ctk.CTkImage(Image.open("src/icons/data.png"), size=(30, 30))
+        self.home_icon = ctk.CTkImage(Image.open("dev/assets/icons/track.png"), size=(30, 30))
+        self.data_icon = ctk.CTkImage(Image.open("dev/assets/icons/data.png"), size=(30, 30))
 
         self.app_status = "Idle"
         self.file_name = None
@@ -470,7 +470,7 @@ def get_serial_ports() -> list:
     return [port.device for port in ports]
 
 if __name__ == "__main__":
-    ctk.set_default_color_theme("src/style.json")
+    ctk.set_default_color_theme("dev/assets/style.json")
     root = ctk.CTk()
     app = DART(root)
     # cProfile.run('app = DART(root)')
