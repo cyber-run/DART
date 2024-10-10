@@ -182,16 +182,19 @@ class DART:
             # Start recording
             self.camera_manager.start_recording(video_path)
             self.record_start_ms = perf_counter_ns() * 1e-6
-            self.data_handler = DataHandler(self.data_queue, 
-                                            batch_size=1000, 
-                                            output_dir=self.video_path, 
-                                            start_time = self.record_start_ms)
-            
-            # Check for old value stored in queue and clear it
-            if self.data_queue.full():
-                _ = self.data_queue.get() # Clear the queue
 
-            self.data_handler.start(data_path)
+            # Start the DataHandler if tracking is enabled
+            if self.track_process is not None:
+                self.data_handler = DataHandler(self.data_queue, 
+                                                batch_size=1000, 
+                                                output_dir=self.video_path, 
+                                                start_time = self.record_start_ms)
+                
+                # Check for old value stored in queue and clear it
+                if self.data_queue.full():
+                    _ = self.data_queue.get() # Clear the queue
+
+                self.data_handler.start(data_path)
 
             # Update the record button to show that recording is in progress
             self.record_button.configure(text="Stop", image=self.stop_icon)
@@ -203,7 +206,10 @@ class DART:
         else:
             # Stop recording
             self.camera_manager.stop_recording()
-            self.data_handler.stop()  # Stop the DataHandler
+
+            # Stop the DataHandler if tracking is enabled
+            if self.track_process is not None:
+                self.data_handler.stop()  # Stop the DataHandler
 
             if self.camera_manager.is_paused:
                 self.pause_button.configure(text="Pause", state="disabled", image=self.pause_icon)

@@ -105,7 +105,7 @@ class TheiaController:
         self.logger.info("Motor sleep power set")
 
         # Set motor drive speed to initalised at 5000
-        self._ser_send("M240 A5000 B5000 C5000")
+        self._ser_send("M240 A5000 B5000 C2000")
         self.logger.info("Motor drive speed set to 5000")
 
         # Set PI low/high detection voltage

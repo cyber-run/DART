@@ -1,11 +1,12 @@
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from views.theia_control_window import TheiaLensControlWindow
+from controllers.theia_controller import TheiaController
 import matplotlib.pyplot as plt
 import customtkinter as ctk
 from CTkMenuBar import *
 from PIL import Image
 import numpy as np
 import serial, os
-
 
 
 GLOBAL_FONT = ("default_theme", 14)
@@ -94,6 +95,21 @@ class DARTGUI:
         file_dropdown.add_option(option="Track", command=self.dart.track)
         file_dropdown.add_separator()
         file_dropdown.add_option(option="Exit", command=self.dart.on_closing)
+
+        # Add Tools menu
+        tools_menu = title_menu.add_cascade(text="Tools")
+        tools_dropdown = CustomDropdownMenu(widget=tools_menu)
+        tools_dropdown.add_option(option="Lens Control", command=self.open_theia_control_window)
+
+    def open_theia_control_window(self):
+        if not hasattr(self, 'theia_controller'):
+            # Initialize the Theia controller with a default port
+            # You might want to make this configurable or use a method to detect the correct port
+            self.theia_controller = TheiaController(port="COM17")
+        
+        # Create and show the Theia Lens Control window
+        self.theia_window = TheiaLensControlWindow(self.window, self.theia_controller)
+        self.theia_window.grab_set()  # Make the window modal
 
     def setup_sidebar(self):
         '''

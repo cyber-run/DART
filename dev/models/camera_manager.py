@@ -23,6 +23,7 @@ class CameraManager:
         self.frame_thread = None
         self.is_reading = False
 
+        # Init cam props
         self.initialise_cam_props()
 
     def initialise_cam_props(self):
@@ -34,6 +35,7 @@ class CameraManager:
     def connect_camera(self, camera_index):
         self.release()
         self.initialize_camera(camera_index)
+        self.initialise_cam_props()
 
     def initialize_camera(self, camera_index=0):
         try:

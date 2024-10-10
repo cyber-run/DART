@@ -24,6 +24,7 @@ class QTMStream(Thread):
         self._stay_open = True
 
         # Kinematic data vars
+        self.markers = None
         self.position = [0,0,0]
         self.position2 = [0,0,0]
         self.lost = False
@@ -78,6 +79,7 @@ class QTMStream(Thread):
                 self.lost = True
             return
 
+        self.markers = new_component
         pos = new_component[0]
         self.position = [pos.x, pos.y, pos.z]
         self.num_markers = len(new_component)

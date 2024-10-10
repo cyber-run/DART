@@ -11,3 +11,4 @@
 /yolo_test
 /local
 /src
+*.pyc
