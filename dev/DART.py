@@ -10,7 +10,7 @@ from controllers.image_processor import ImageProcessor
 from CTkMessagebox import CTkMessagebox
 from multiprocessing import Process, Queue, Event
 from models.data_handler import DataHandler
-from controllers.dart_track import dart_track
+from controllers.dart_track_akf import dart_track
 from controllers.calibrate import Calibrator
 import serial.tools.list_ports
 import customtkinter as ctk
