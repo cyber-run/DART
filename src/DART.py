@@ -69,7 +69,8 @@ class DART:
         
         if self.state.recording.is_live:
             self.camera_manager.start_frame_thread()
-            self.update_video_label()
+            if self.state.get_current_view() == "track":
+                self.update_video_label()
         else:
             self.camera_manager.stop_frame_thread()
 
@@ -237,11 +238,11 @@ class DART:
         img = Image.fromarray(img)
 
         # Convert to tk img
-        # img = ctk.CTkImage(img, size = (self.camera_manager.frame_width*(2/3), self.camera_manager.frame_height*(2/3)))
-        img = ctk.CTkImage(img, size = (self.camera_manager.frame_width, self.camera_manager.frame_height))
+        img = ctk.CTkImage(img, size=(self.camera_manager.frame_width, self.camera_manager.frame_height))
 
-        # Update label with new image
-        self.gui.video_label.configure(image=img)
+        # Update label with new image through state manager
+        if self.state.ui.video_label:
+            self.state.ui.video_label.configure(image=img)
 
     def set_threshold(self, value: float):
         self.image_pro.threshold_value = int(value)

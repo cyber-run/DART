@@ -114,6 +114,12 @@ class DARTState:
         
         # Add UI state
         self.ui = UIState()
+        
+        # Add view state
+        self.view = {
+            'current': "track",  # Default view
+            'available': ["track", "data"]
+        }
     
     def load_icons(self) -> dict:
         """Load all GUI icons and images"""
@@ -187,3 +193,14 @@ class DARTState:
         elif device_type == 'dyna' and self.hardware.dyna:
             self.hardware.dyna.close_port()
             self.hardware.dyna = None
+
+    def set_current_view(self, view_name: str) -> None:
+        """Update current view"""
+        if view_name in self.view['available']:
+            self.view['current'] = view_name
+        else:
+            logging.error(f"Invalid view name: {view_name}")
+    
+    def get_current_view(self) -> str:
+        """Get current view name"""
+        return self.view['current']

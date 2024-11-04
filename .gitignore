@@ -3,6 +3,7 @@ __pycache__/
 **/__pycache__/
 *.py[cod]
 *$py.class
+venv310/
 
 # Virtual environments
 .venv/
@@ -13,6 +14,7 @@ env.bak/
 venv.bak/
 venv38/
 .Python
+static/recordings/
 
 # Project-specific directories
 /__pycache__/
