@@ -15,17 +15,16 @@ venv38/
 .Python
 
 # Project-specific directories
-/dev/__pycache__/
-/dev/recordings
+/__pycache__/
+/recordings
 /test/
-/dev/output
+/output
 /calibration_images/
 /calibration_data.npz
 /misc/
 /static/ffmpeg/
 /yolo_test
-/local
-/src
+/_local
 
 # C extensions
 *.so

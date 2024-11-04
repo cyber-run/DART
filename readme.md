@@ -1,58 +1,143 @@
-## How to setup for running scripts
+# DART Project Documentation
 
-- First create 3.8 python venv => python3.8 -m venv venv38 
+## Project Structure
 
-- Then activate venv => source venv38/bin/activate
+```
+main.py                      # Application entry point - initializes DART and GUI
 
-- Then install requirements => pip install -r requirements.txt
+_vendor/                     # Third-party dependencies
+└── wheels/                 # Python wheel files for dependencies
+    └── *.whl
 
-- Then run any scripts as required => python <script_name>.py
+assets/                      # Static assets
+└── icons/                  # GUI icons for the application
+    └── *.png
 
-- /dev/ => is current working folder
+config/                      # Configuration files
+└── style.json             # CustomTkinter theme and UI styling
 
-## TODO list:
+src/                         # Main source code directory
+├── DART.py                # Main application class and core logic
+├── core/
+│   └── image_processor.py # Image processing and analysis functions
+├── data/
+│   └── data_handler.py    # Data logging and management (Parquet format)
+├── hardware/              # Hardware interface modules
+│   ├── camera/
+│   │   └── camera_manager.py    # Camera control and video feed management
+│   ├── mocap/
+│   │   └── qtm_mocap.py        # QTM motion capture system interface
+│   └── motion/
+│       ├── dyna_controller.py   # Dynamixel servo motor control (pan/tilt)
+│       └── theia_controller.py  # Theia lens control (focus/zoom)
+├── tracking/              # Target tracking and calibration
+│   ├── calibrate.py      # System calibration and coordinate transforms
+│   ├── dart_track.py     # Basic tracking implementation
+│   └── dart_track_akf.py # Advanced tracking with Adaptive Kalman Filter
+├── ui/                    # User interface components
+│   ├── dart_gui.py       # Main application GUI
+│   └── views/
+│       └── theia_control_window.py  # Lens control interface
+└── utils/                 # Utility functions
+    ├── misc_funcs.py     # General helper functions
+    └── perf_timings.py   # High-precision performance timing utilities
+    
+static/                     # Static files and recordings
+└── recordings/           # Storage for recorded data
+    └── *.mp4            # Video recordings
+    └── *.parquet        # Tracking data in Parquet format
 
-- [x] Implement motor calibration through app
+```
 
-- [x] Spawn tracking process with rotation matrix
+## Core Components
 
-- [x] Add upgraded motor (and horns) with new mirror mount hardware
+### 1. Main Application (`DART.py`)
+- Initializes the main application window
+- Manages hardware connections (camera, motors, motion capture)
+- Coordinates between different subsystems
+- Handles user interface events
 
-- [x] Investigate QuadDXL controller for higher control frequency
+### 2. Hardware Integration
 
-- [x] Add sync read and optimise param delcarlation for sync methods
+#### Camera System (`camera_manager.py`)
+- Manages camera connections and settings
+- Handles video feed capture and display
+- Supports video recording functionality
+- Controls exposure and gain settings
 
-- [x] Optimse fsolve for better convergence ie initial guess; more runs; higher tolerance
+#### Motion Control
+##### Dynamixel Controller (`dyna_controller.py`)
+- Controls pan/tilt servo motors
+- Handles motor calibration and positioning
+- Manages motor gains and operating modes
 
-- [x] Fix bug where calibration angle carries over to another run in session
+##### Theia Controller (`theia_controller.py`)
+- Controls lens focus and zoom
+- Provides lens calibration functionality
+- Manages lens movement and positioning
 
-- [x] Add stop button for tracking -> terminate process
+##### Motion Capture (`qtm_mocap.py`)
+- Interfaces with QTM motion capture system
+- Provides real-time position tracking
+- Handles data streaming and synchronization
 
-- [x] Refactor code to be more modular and readable and create dev branch
+### 3. Tracking System
 
-- [x] Add cd and user 
+#### Adaptive Kalman Filter (`dart_track_akf.py`)
+- Implements advanced target tracking
+- Uses adaptive Kalman filtering for position prediction
+- Handles latency compensation
+- Provides real-time position estimation
 
-- [x] tilt calibration
-    - [x] ammend calibrator class for additional point collection
-    - [x] add tilt centre to tracking calculation
-    - [ ] possibly change UI/UX for procedure
+#### Calibration (`calibrate.py`)
+- Manages system calibration
+- Handles coordinate transformations
+- Stores and loads calibration data
+- Provides verification and visualization tools
 
-- [x] add video compression -> VidGear
+### 4. Data Management (`data_handler.py`)
+- Handles data logging and storage
+- Manages data queues and batch processing
+- Supports Parquet file format for data storage
+- Provides data merging and organization
 
-- [x]  sync recording camera
+### 5. User Interface
 
-- [x] add thread for position recording on dyna_controller
+#### Main GUI (`dart_gui.py`)
+- Provides main application interface
+- Displays video feed and controls
+- Manages motor control interface
+- Handles recording and playback controls
 
-- [x] Log and sync event in mocap
+#### Lens Control GUI (`theia_control_window.py`)
+- Provides lens control interface
+- Manages focus and zoom controls
+- Displays lens status and settings
 
-- [x] Get a bigger hard drive
+### 6. Utilities
+- Performance timing and optimization
+- High-precision timing controls
+- System configuration management
+- Miscellaneous helper functions
 
-- [x] Log position readings
+## Key Features
+- Real-time target tracking
+- Video recording and playback
+- Motion capture integration
+- Adaptive tracking algorithms
+- System calibration tools
+- Data logging and analysis
+- Hardware control and monitoring
+- User-friendly interface
 
-- [x] CHECK MOTOR SETTINGS ie pwm ramp
+## Technical Specifications
+- Built with Python
+- Uses CustomTkinter for GUI
+- Supports high-speed camera integration
+- Real-time performance optimization
+- Data logging in Parquet format
+- Hardware synchronization capabilities
 
-- [x] Link mocap control and all recording functions together
+---
 
-- [ ] Cancel recording
-
-- [ ] take the mean of multiple markers
+> This project is a sophisticated tracking system combining motion capture, servo control, and video processing for real-time target tracking and analysis.
