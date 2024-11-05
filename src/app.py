@@ -14,7 +14,7 @@ from tracking.dart_track_akf import dart_track
 from tracking.calibrate import Calibrator
 import serial.tools.list_ports
 import customtkinter as ctk
-from ui.dart_gui import DARTGUI
+from ui.main_window import MainWindow
 from hardware.mocap.qtm_mocap import *
 from PIL import Image
 import tkinter as tk
@@ -34,7 +34,7 @@ class DART:
         self.window.bind("<Configure>", self.on_configure)
 
         self.init_hardware()
-        self.gui = DARTGUI(window, self)
+        self.main_window = MainWindow(window, self)
 
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.window.mainloop()
@@ -260,26 +260,26 @@ class DART:
     def connect_dyna_controller(self):
         """Initializes or reconnects the DynaController with the selected COM port."""
         try:
-            selected_port = self.state.hardware.selected_com_port.get()  # Ensure this matches how you obtain the selected COM port value
+            selected_port = self.state.hardware.selected_com_port.get()
             if selected_port:
                 self.dyna = DynaController(com_port=selected_port)
-                self.dyna.open_port()
-
-                self.dyna.set_gains(self.dyna.pan_id, 2432, 720, 3200, 0)
-                self.dyna.set_gains(self.dyna.tilt_id, 2432, 720, 3200, 0)
-
-                self.dyna.set_op_mode(1, 3)  # Pan to position control
-                self.dyna.set_op_mode(2, 3)  # Tilt to position control
-
-                self.dyna.set_sync_pos(45, 45)
-
-                self.dyna.set_torque(self.dyna.pan_id, self.state.flags['torque'].get())
-                self.dyna.set_torque(self.dyna.tilt_id, self.state.flags['torque'].get())
-                
-                logging.info(f"Connected to Dynamixel controller on {selected_port}.")
+                if self.dyna.open_port():
+                    self.dyna.set_gains(self.dyna.pan_id, 2432, 720, 3200, 0)
+                    self.dyna.set_gains(self.dyna.tilt_id, 2432, 720, 3200, 0)
+                    self.dyna.set_op_mode(1, 3)  # Pan to position control
+                    self.dyna.set_op_mode(2, 3)  # Tilt to position control
+                    self.dyna.set_sync_pos(45, 45)
+                    self.dyna.set_torque(self.dyna.pan_id, self.state.flags['torque'].get())
+                    self.dyna.set_torque(self.dyna.tilt_id, self.state.flags['torque'].get())
+                    self.ui_controller.update_motors_status("Connected")
+                    logging.info(f"Connected to Dynamixel controller on {selected_port}.")
+                else:
+                    self.ui_controller.update_motors_status("Failed")
             else:
+                self.ui_controller.update_motors_status("Not Selected")
                 logging.error("No COM port selected.")
         except Exception as e:
+            self.ui_controller.update_motors_status("Error")
             logging.error(f"Error connecting to Dynamixel controller: {e}")
             self.dyna = None
 
@@ -295,8 +295,12 @@ class DART:
         selected_camera = self.state.hardware.selected_camera.get()
         if selected_camera:
             camera_index = int(selected_camera.split(" ")[1])
-            self.camera_manager.connect_camera(camera_index)
+            if self.camera_manager.connect_camera(camera_index):
+                self.ui_controller.update_camera_status("Connected")
+            else:
+                self.ui_controller.update_camera_status("Failed")
         else:
+            self.ui_controller.update_camera_status("Not Selected")
             logging.error("No camera selected.")
 
     def mocap_button_press(self):
@@ -375,12 +379,13 @@ class DART:
             self.toggle_video_feed()
         
         # Cleanup GUI resources
-        self.gui.cleanup_resources()
+        self.main_window.cleanup_resources()
         
         try:
             # Close the camera
             self.camera_manager.stop_frame_thread()
             self.camera_manager.release()
+            self.ui_controller.update_camera_status("Disconnected")
         except Exception as e:
             logging.info(f"Error closing camera: {e}")
     
@@ -390,6 +395,7 @@ class DART:
                 self.state.hardware.qtm_stream._close()
                 self.state.hardware.qtm_stream.close()
                 self.state.hardware.qtm_stream = None
+                self.ui_controller.update_mocap_status("Disconnected")
         except Exception as e:
             logging.info(f"Error closing QTM connection: {e}")
 
@@ -398,6 +404,7 @@ class DART:
             if self.dyna is not None:
                 self.dyna.close_port()
                 self.dyna = None
+                self.ui_controller.update_motors_status("Disconnected")
         except Exception as e:
             logging.info(f"Error closing serial port: {e}")
 
@@ -426,9 +433,13 @@ class DART:
 
     def get_mem(self):
         """Get system memory usage and update display"""
-        self.state.status['memory_usage'] = psutil.virtual_memory()[2]
-        self.ui_controller.update_memory_usage(self.state.status['memory_usage'])
-        self.window.after(5000, self.get_mem)
+        try:
+            self.state.status['memory_usage'] = psutil.virtual_memory()[2]
+            self.ui_controller.update_memory_usage(self.state.status['memory_usage'])
+            # Schedule next update
+            self.window.after(5000, self.get_mem)
+        except Exception as e:
+            logging.error(f"Error updating memory usage: {e}")
 
     def track(self):
         """Handle tracking start/stop"""

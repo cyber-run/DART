@@ -17,9 +17,10 @@ config/                      # Configuration files
 └── style.json             # CustomTkinter theme and UI styling
 
 src/                         # Main source code directory
-├── DART.py                # Main application class and core logic
-├── core/
-│   └── image_processor.py # Image processing and analysis functions
+├── app.py                 # Main application class and core logic
+├── core/                  # Core application components
+│   ├── image_processor.py # Image processing and analysis functions
+│   └── state_manager.py  # Application state management
 ├── data/
 │   └── data_handler.py    # Data logging and management (Parquet format)
 ├── hardware/              # Hardware interface modules
@@ -35,9 +36,17 @@ src/                         # Main source code directory
 │   ├── dart_track.py     # Basic tracking implementation
 │   └── dart_track_akf.py # Advanced tracking with Adaptive Kalman Filter
 ├── ui/                    # User interface components
-│   ├── dart_gui.py       # Main application GUI
-│   └── views/
-│       └── theia_control_window.py  # Lens control interface
+│   ├── main_window.py    # Main window management and layout
+│   ├── ui_controller.py  # UI state updates and management
+│   ├── components/       # Reusable UI components
+│   │   ├── menu_bar.py  # Application menu
+│   │   ├── navbar.py    # Navigation sidebar
+│   │   └── status_bar.py # Status display
+│   └── views/           # Application views
+│       ├── base_view.py # Base view class
+│       ├── track_view.py # Main tracking view
+│       ├── dashboard_view.py # Data analysis view
+│       └── theia_control_window.py # Lens control interface
 └── utils/                 # Utility functions
     ├── misc_funcs.py     # General helper functions
     └── perf_timings.py   # High-precision performance timing utilities
@@ -51,7 +60,7 @@ static/                     # Static files and recordings
 
 ## Core Components
 
-### 1. Main Application (`DART.py`)
+### 1. Main Application (`app.py`)
 - Initializes the main application window
 - Manages hardware connections (camera, motors, motion capture)
 - Coordinates between different subsystems
@@ -103,7 +112,7 @@ static/                     # Static files and recordings
 
 ### 5. User Interface
 
-#### Main GUI (`dart_gui.py`)
+#### Main GUI (`main_window.py`)
 - Provides main application interface
 - Displays video feed and controls
 - Manages motor control interface

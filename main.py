@@ -7,7 +7,7 @@ import customtkinter as ctk
 src_path = Path(__file__).parent / "src"
 sys.path.append(str(src_path))
 
-from DART import DART
+from app import DART  # Updated import
 
 if __name__ == "__main__":
     ctk.set_default_color_theme("config/style.json")

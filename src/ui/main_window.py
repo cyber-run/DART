@@ -6,7 +6,8 @@ from ui.components.menu_bar import MenuBar
 from hardware.motion.theia_controller import TheiaController
 from ui.views.theia_control_window import TheiaLensControlWindow
 
-class DARTGUI:
+class MainWindow:
+    """Manages the main application window and its layout components."""
     def __init__(self, window, dart_instance):
         self.window = window
         self.dart = dart_instance
@@ -17,31 +18,8 @@ class DARTGUI:
         self.setup_menu()
         
         # Create initial view
-        self.create_view("track")  # Create initial view
-        self.switch_view("track")  # Switch to initial view
-
-    def create_view(self, view_name: str) -> None:
-        """Create a new view if it doesn't exist"""
-        if view_name not in self.views:
-            if view_name == "track":
-                self.views[view_name] = TrackView(self.window, self.dart)
-            elif view_name == "data":
-                self.views[view_name] = DashboardView(self.window, self.dart)
-
-    def switch_view(self, view_name: str):
-        """Switch between views"""
-        # Create the new view if it doesn't exist
-        self.create_view(view_name)
-        
-        # Hide current view if exists
-        current_view = self.dart.state.get_current_view()
-        if current_view in self.views:
-            self.views[current_view].grid_remove()
-        
-        # Show new view
-        self.views[view_name].grid(row=0, column=1, columnspan=2, sticky="nsew")
-        self.dart.state.set_current_view(view_name)
-        self.navbar.set_active_button(view_name)
+        self.create_view("track")
+        self.switch_view("track")
 
     def setup_layout(self):
         """Set up main layout and persistent components"""
@@ -66,6 +44,32 @@ class DARTGUI:
             self.dart.calibrator
         )
         self.status_bar.grid(row=4, column=0, columnspan=3, sticky="nsew", pady=(5,0))
+
+        # Start memory monitoring
+        self.dart.get_mem()
+
+    def create_view(self, view_name: str) -> None:
+        """Create a new view if it doesn't exist"""
+        if view_name not in self.views:
+            if view_name == "track":
+                self.views[view_name] = TrackView(self.window, self.dart)
+            elif view_name == "data":
+                self.views[view_name] = DashboardView(self.window, self.dart)
+
+    def switch_view(self, view_name: str):
+        """Switch between views"""
+        # Create the new view if it doesn't exist
+        self.create_view(view_name)
+        
+        # Hide current view if exists
+        current_view = self.dart.state.get_current_view()
+        if current_view in self.views:
+            self.views[current_view].grid_remove()
+        
+        # Show new view
+        self.views[view_name].grid(row=0, column=1, columnspan=2, sticky="nsew")
+        self.dart.state.set_current_view(view_name)
+        self.navbar.set_active_button(view_name)
 
     def setup_menu(self):
         """Set up the menu bar"""

@@ -14,7 +14,12 @@ class UIController:
     def update_memory_usage(self, usage: float) -> None:
         """Update the memory usage display"""
         if self.dart.state.ui.memory_label:
-            self.dart.state.ui.memory_label.configure(text=f"Memory usage: {usage}%")
+            try:
+                self.dart.state.ui.memory_label.configure(
+                    text=f"Memory usage: {round(usage, 1)}%"
+                )
+            except Exception as e:
+                logging.error(f"Error updating memory label: {e}")
             
     def update_camera_status(self, status: str) -> None:
         """Update camera connection status"""
