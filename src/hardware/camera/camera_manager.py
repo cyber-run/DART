@@ -32,10 +32,45 @@ class CameraManager:
         self.frame_size = (self.frame_width, self.frame_height)
         self.fps = round(self.cap.get(cv2.CAP_PROP_FPS), 2)
 
-    def connect_camera(self, camera_index):
-        self.release()
-        self.initialize_camera(camera_index)
-        self.initialise_cam_props()
+    def connect_camera(self, serial):
+        """Connect to camera by serial number"""
+        try:
+            if self.cap:
+                self.release()
+                
+            self.cap = EasyPySpin.VideoCapture(serial)
+            if not self.cap.isOpened():
+                logging.error(f"Failed to open camera {serial}")
+                return False
+                
+            # Start acquisition
+            self.cap.cam.BeginAcquisition()
+            
+            # Initialize camera properties
+            self.initialise_cam_props()
+            logging.info(f"Successfully connected to camera {serial}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error connecting to camera {serial}: {e}")
+            return False
+            
+    def release(self):
+        """Safely release camera resources"""
+        try:
+            if self.cap:
+                # Stop frame thread if running
+                if self.is_reading:
+                    self.stop_frame_thread()
+                    
+                # Stop acquisition
+                if self.cap.cam.IsStreaming():
+                    self.cap.cam.EndAcquisition()
+                    
+                self.cap.release()
+                self.cap = None
+        except Exception as e:
+            logging.error(f"Error releasing camera: {e}")
 
     def initialize_camera(self, camera_index=0):
         try:
@@ -52,10 +87,6 @@ class CameraManager:
         # self.cap.set_pyspin_value('AcquisitionFrameRateEnable', False)
         # self.cap.set_pyspin_value('AcquisitionFrameRate', 201)
         pass
-
-    def release(self):
-        if self.cap:
-            self.cap.release()
 
     def start_frame_thread(self):
         self.is_reading = True

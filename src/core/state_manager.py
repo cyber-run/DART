@@ -1,17 +1,18 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image
 import os
-from typing import Optional, Any
+from typing import Optional, Any, List
 from multiprocessing import Process, Queue, Event
 import logging
 
 @dataclass
 class HardwareState:
     """Manages hardware connection states"""
-    selected_com_port: ctk.StringVar
-    selected_camera: ctk.StringVar
+    cameras: List[str] = field(default_factory=list)
+    dynamixel_port: Optional[str] = None
+    theia_port: Optional[str] = None
     qtm_stream: Any = None
     dyna: Any = None
 
@@ -76,8 +77,9 @@ class DARTState:
         logging.basicConfig(level=logging.ERROR)
         # Initialize state containers
         self.hardware = HardwareState(
-            selected_com_port=ctk.StringVar(value=""),
-            selected_camera=ctk.StringVar(value="")
+            cameras=[],
+            dynamixel_port=None,
+            theia_port=None
         )
         
         self.recording = RecordingState()

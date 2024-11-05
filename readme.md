@@ -14,13 +14,15 @@ assets/                      # Static assets
     └── *.png
 
 config/                      # Configuration files
-└── style.json             # CustomTkinter theme and UI styling
+├── style.json             # CustomTkinter theme and UI styling
+└── app_config.json        # Application configuration (devices, calibration)
 
 src/                         # Main source code directory
 ├── app.py                 # Main application class and core logic
 ├── core/                  # Core application components
 │   ├── image_processor.py # Image processing and analysis functions
-│   └── state_manager.py  # Application state management
+│   ├── state_manager.py  # Application state management
+│   └── config_manager.py # Configuration management
 ├── data/
 │   └── data_handler.py    # Data logging and management (Parquet format)
 ├── hardware/              # Hardware interface modules
@@ -60,89 +62,79 @@ static/                     # Static files and recordings
 
 ## Core Components
 
-### 1. Main Application (`app.py`)
-- Initializes the main application window
-- Manages hardware connections (camera, motors, motion capture)
-- Coordinates between different subsystems
-- Handles user interface events
+### 1. Configuration Management (`config_manager.py`)
+- Centralized configuration storage in JSON format
+- Manages device settings and calibration data
+- Handles configuration persistence
+- Provides type-safe configuration access
 
-### 2. Hardware Integration
-
+### 2. Hardware Management
 #### Camera System (`camera_manager.py`)
-- Manages camera connections and settings
-- Handles video feed capture and display
+- Auto-connects to configured FLIR cameras
+- Manages video feed capture and display
 - Supports video recording functionality
 - Controls exposure and gain settings
 
 #### Motion Control
 ##### Dynamixel Controller (`dyna_controller.py`)
+- Auto-connects to configured COM port
 - Controls pan/tilt servo motors
 - Handles motor calibration and positioning
 - Manages motor gains and operating modes
 
 ##### Theia Controller (`theia_controller.py`)
+- Auto-connects to configured COM port
 - Controls lens focus and zoom
 - Provides lens calibration functionality
 - Manages lens movement and positioning
 
 ##### Motion Capture (`qtm_mocap.py`)
-- Interfaces with QTM motion capture system
+- Manual connection to QTM system
 - Provides real-time position tracking
 - Handles data streaming and synchronization
 
-### 3. Tracking System
+### 3. User Interface
+#### Main Window (`main_window.py`)
+- Manages application layout
+- Handles view switching
+- Coordinates UI components
 
-#### Adaptive Kalman Filter (`dart_track_akf.py`)
-- Implements advanced target tracking
-- Uses adaptive Kalman filtering for position prediction
-- Handles latency compensation
-- Provides real-time position estimation
+#### Views
+- Track View: Main tracking interface
+- Dashboard View: Data analysis interface
+- Component-based architecture
+- Consistent styling and behavior
 
-#### Calibration (`calibrate.py`)
-- Manages system calibration
-- Handles coordinate transformations
-- Stores and loads calibration data
-- Provides verification and visualization tools
+#### UI Controller (`ui_controller.py`)
+- Centralizes UI updates
+- Manages UI state
+- Provides type-safe UI operations
 
-### 4. Data Management (`data_handler.py`)
-- Handles data logging and storage
-- Manages data queues and batch processing
-- Supports Parquet file format for data storage
-- Provides data merging and organization
-
-### 5. User Interface
-
-#### Main GUI (`main_window.py`)
-- Provides main application interface
-- Displays video feed and controls
-- Manages motor control interface
-- Handles recording and playback controls
-
-#### Lens Control GUI (`theia_control_window.py`)
-- Provides lens control interface
-- Manages focus and zoom controls
-- Displays lens status and settings
-
-### 6. Utilities
-- Performance timing and optimization
-- High-precision timing controls
-- System configuration management
-- Miscellaneous helper functions
+### 4. Process Management
+- Main process handles:
+  - User interface
+  - Camera operations
+  - Configuration
+- Tracking process handles:
+  - Motion capture
+  - Motor control
+  - Real-time tracking
 
 ## Key Features
+- Automatic device detection and configuration
+- Persistent device settings
+- Component-based UI architecture
 - Real-time target tracking
 - Video recording and playback
 - Motion capture integration
 - Adaptive tracking algorithms
 - System calibration tools
 - Data logging and analysis
-- Hardware control and monitoring
-- User-friendly interface
 
 ## Technical Specifications
-- Built with Python
+- Built with Python 3.8+
 - Uses CustomTkinter for GUI
-- Supports high-speed camera integration
+- JSON-based configuration
 - Real-time performance optimization
 - Data logging in Parquet format
 - Hardware synchronization capabilities

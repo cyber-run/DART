@@ -9,6 +9,7 @@ import numpy as np
 import queue
 import threading  # Ensure threading is imported
 import math  # Import math module for calculations
+from core.config_manager import ConfigManager
 
 
 class DynaTracker:
@@ -20,14 +21,28 @@ class DynaTracker:
       data.
     '''
     def __init__(self, data_queue, com_port='COM5'):
-        # Load calibration data if it exists
-        if os.path.exists('config/calib_data.pkl'):
-            with open('config/calib_data.pkl', 'rb') as f:
-                self.pan_origin, self.tilt_origin, self.rotation_matrix, _ = pickle.load(f)
-                logging.info("Calibration data loaded successfully.")
-        else:
-            logging.error("No calibration data found.")
-            raise FileNotFoundError("Calibration data not found at 'config/calib_data.pkl'")
+        # Load configuration
+        self.config = ConfigManager()
+        
+        # Get calibration data from config
+        pan_origin, tilt_origin, rotation_matrix = self.config.get_calibration_data()
+        if pan_origin is None or tilt_origin is None or rotation_matrix is None:
+            logging.error("No calibration data found in config.")
+            raise ValueError("Calibration data not found")
+            
+        self.pan_origin = pan_origin
+        self.tilt_origin = tilt_origin
+        self.rotation_matrix = rotation_matrix
+        logging.info("Calibration data loaded successfully.")
+
+        # Get device configuration
+        device_config = self.config.config["devices"]
+        dyna_port = device_config["dynamixel_port"]
+        theia_port = device_config["theia_port"]
+        
+        if not dyna_port or not theia_port:
+            logging.error("Motor controller ports not configured")
+            raise ValueError("Motor controller configuration missing")
 
         # Create a queue to store data
         self.data_queue = data_queue
@@ -38,7 +53,7 @@ class DynaTracker:
         time.sleep(0.1)
 
         # Create dynamixel controller object and open serial port
-        self.dyna = DynaController(com_port)
+        self.dyna = DynaController(dyna_port)  # Use configured port
         self.dyna.open_port()
 
         self.dyna.set_gains(1, 2432, 720, 3200, 0)
@@ -52,7 +67,7 @@ class DynaTracker:
 
         self.mean_origin = (self.pan_origin + self.tilt_origin) / 2
 
-        self.theia = TheiaController(port="COM17")
+        self.theia = TheiaController(port=theia_port)  # Use configured port
         self.theia.connect()
         self.theia.initialise()
 

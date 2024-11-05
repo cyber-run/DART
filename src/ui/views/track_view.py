@@ -40,33 +40,6 @@ class TrackView(BaseView):
         self.motor_frame.configure(fg_color=FRAME_COLOR)
         self.motor_frame.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
-        # Get available serial ports
-        serial_ports = [port.device for port in serial.tools.list_ports.comports()]
-
-        # Serial port frame
-        serial_frame = ctk.CTkFrame(self.motor_frame, fg_color=TRANSPARENT)
-        serial_frame.pack(side="top", padx=10, pady=10)
-
-        # COM port selection
-        self.dart.state.ui.com_port_combobox = ctk.CTkComboBox(
-            serial_frame, 
-            width=100, 
-            values=serial_ports,
-            variable=self.dart.state.hardware.selected_com_port,
-            command=lambda choice: self.dart.connect_dyna_controller()
-        )
-        self.dart.state.ui.com_port_combobox.pack(side="left", padx=5, pady=5)
-
-        # Refresh button
-        self.dart.state.ui.serial_refresh = ctk.CTkButton(
-            serial_frame, 
-            width=28, 
-            text="", 
-            image=self.dart.state.get_icon('refresh'),
-            command=self.dart.update_serial_ports_dropdown
-        )
-        self.dart.state.ui.serial_refresh.pack(side="left", padx=5, pady=5)
-
         # Torque checkbox
         self.dart.state.ui.torque_checkbox = ctk.CTkCheckBox(
             self.motor_frame,
@@ -225,31 +198,6 @@ class TrackView(BaseView):
         self.camera_frame.configure(fg_color=FRAME_COLOR)
         self.camera_frame.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
 
-        # Camera selection frame
-        cam_frame = ctk.CTkFrame(self.camera_frame, fg_color=TRANSPARENT)
-        cam_frame.pack(side="left", padx=10, pady=10, anchor="center", expand=True)
-
-        # Camera selection dropdown
-        self.dart.state.ui.cam_combobox = ctk.CTkComboBox(
-            cam_frame,
-            width=100,
-            values=[],
-            variable=self.dart.state.hardware.selected_camera,
-            command=self.dart.connect_camera
-        )
-        self.dart.state.ui.cam_combobox.pack(side="left", padx=5, pady=5)
-
-        # Camera refresh button
-        self.dart.state.ui.cam_refresh = ctk.CTkButton(
-            cam_frame,
-            width=28,
-            text="",
-            image=self.dart.state.get_icon('refresh'),
-            command=self.dart.update_camera_dropdown,
-            font=GLOBAL_FONT
-        )
-        self.dart.state.ui.cam_refresh.pack(side="left", padx=5, pady=5)
-
         # Video toggle button
         self.dart.state.ui.toggle_video_button = ctk.CTkButton(
             self.camera_frame,
@@ -350,13 +298,17 @@ class TrackView(BaseView):
         )
         self.dart.state.ui.pause_button.pack(side="left", padx=10, anchor="center", expand=True)
 
-        # FPS display
+        # FPS display with safe default
         fps_frame = ctk.CTkFrame(self.camera_frame, fg_color=TRANSPARENT)
         fps_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
         
+        fps_value = (self.dart.camera_manager.fps 
+                    if hasattr(self.dart, 'camera_manager') 
+                    else 0)
+        
         self.dart.state.ui.fps_label = ctk.CTkLabel(
             fps_frame,
-            text=f"FPS: {round(self.dart.camera_manager.fps, 2)}",
+            text=f"FPS: {round(fps_value, 2)}",
             font=GLOBAL_FONT
         )
         self.dart.state.ui.fps_label.pack(padx=5, pady=5)

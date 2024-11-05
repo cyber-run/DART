@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import logging
 
 class StatusBar(ctk.CTkFrame):
     def __init__(self, parent, state_manager, calibrator):
@@ -28,7 +29,7 @@ class StatusBar(ctk.CTkFrame):
         # Camera status
         self.state.ui.camera_status = ctk.CTkLabel(
             self,
-            text="Camera: -",
+            text="Camera: Ready",
             font=("default_theme", 14),
             height=18
         )
@@ -37,7 +38,7 @@ class StatusBar(ctk.CTkFrame):
         # Mocap status
         self.state.ui.mocap_status = ctk.CTkLabel(
             self,
-            text="Mocap: -",
+            text="Mocap: Ready",
             font=("default_theme", 14),
             height=18
         )
@@ -46,7 +47,7 @@ class StatusBar(ctk.CTkFrame):
         # Motors status
         self.state.ui.motors_status = ctk.CTkLabel(
             self,
-            text="Motors: -",
+            text="Motors: Ready",
             font=("default_theme", 14),
             height=18
         )
@@ -69,3 +70,19 @@ class StatusBar(ctk.CTkFrame):
             font=("default_theme", 14)
         )
         self.state.ui.memory_label.pack(side="right", padx=10, pady=0, anchor="e", expand=False) 
+
+    def cleanup(self):
+        """Safely cleanup status bar"""
+        try:
+            # Remove references to labels before destroying
+            self.state.ui.status_label = None
+            self.state.ui.camera_status = None
+            self.state.ui.mocap_status = None
+            self.state.ui.motors_status = None
+            self.state.ui.memory_label = None
+            self.state.ui.age_label = None
+            
+            # Destroy frame
+            self.destroy()
+        except Exception as e:
+            logging.debug(f"Error cleaning up status bar: {e}")

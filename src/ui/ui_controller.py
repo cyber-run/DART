@@ -35,6 +35,11 @@ class UIController:
         """Update motor status"""
         if self.dart.state.ui.motors_status:
             self.dart.state.ui.motors_status.configure(text=f"Motors: {status}")
+            # Enable/disable torque checkbox based on connection status
+            if self.dart.state.ui.torque_checkbox:
+                self.dart.state.ui.torque_checkbox.configure(
+                    state="normal" if status == "Connected" else "disabled"
+                )
             
     def update_calibration_age(self, age: int) -> None:
         """Update calibration age display"""

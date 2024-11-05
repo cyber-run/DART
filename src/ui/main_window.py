@@ -75,6 +75,7 @@ class MainWindow:
         """Set up the menu bar"""
         self.menu_bar = MenuBar(
             parent=self.window,
+            dart_instance=self.dart,
             track_callback=self.dart.track,
             exit_callback=self.dart.on_closing,
             lens_control_callback=self.open_theia_control_window
@@ -82,11 +83,11 @@ class MainWindow:
 
     def open_theia_control_window(self):
         """Open the Theia lens control window"""
-        if not hasattr(self, 'theia_controller'):
-            self.theia_controller = TheiaController(port="COM17")
-        
-        self.theia_window = TheiaLensControlWindow(self.window, self.theia_controller)
-        self.theia_window.grab_set()
+        if not hasattr(self, 'theia_window'):
+            self.theia_window = TheiaLensControlWindow(self.window, self.dart)
+            self.theia_window.grab_set()
+        else:
+            self.theia_window.focus()
 
     def cleanup_resources(self):
         """Clean up resources before closing"""

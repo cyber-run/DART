@@ -5,26 +5,23 @@ from typing import Tuple
 import numpy as np
 
 class Calibrator:
-    def __init__(self):
+    def __init__(self, config_manager):
+        self.config = config_manager
         self.positions = []
-        self.rotation_matrix = None
-        self.pan_origin = None
         self.calibration_step = 0
-        self.calibrated = False
-        self.calibration_age = None
-
-        # Load calibration data if it exists
-        calib_data_path = 'config/calib_data.pkl'
-        if os.path.exists(calib_data_path):
-            with open(calib_data_path, 'rb') as f:
-                self.pan_origin, self.tilt_origin, self.rotation_matrix, self.date_time = pickle.load(f)
-                self.calibrated = True
-                self.calibration_age = (datetime.now() - self.date_time).total_seconds() / 3600
-                logging.info("Calibration data loaded successfully.")
-                print(f"Local origin: {self.pan_origin}")
+        
+        # Load existing calibration
+        pan_origin, tilt_origin, rotation_matrix = self.config.get_calibration_data()
+        self.pan_origin = pan_origin
+        self.tilt_origin = tilt_origin
+        self.rotation_matrix = rotation_matrix
+        self.calibrated = self.config.config["calibration"]["is_calibrated"]
+        self.calibration_age = self.config.get_calibration_age()
+        
+        if self.calibrated:
+            logging.info("Calibration data loaded successfully.")
         else:
             logging.info("No calibration data found.")
-
 
     def run(self, p1: np.ndarray, p2: np.ndarray):
         self.positions.append(p1)
@@ -44,7 +41,8 @@ class Calibrator:
             self.calibration_step = 0
             print("Calibration completed.")
 
-    def calibrate(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray, p5: np.ndarray, p6: np.ndarray):
+    def calibrate(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, 
+                 p4: np.ndarray, p5: np.ndarray, p6: np.ndarray):
         x1, x2 = self.find_closest_points(p1, p2, p3, p4)
         self.pan_origin = self.calculate_midpoint(x1, x2)
 
@@ -65,12 +63,12 @@ class Calibrator:
 
         self.rotation_matrix = np.column_stack((x_axis, y_axis, z_axis))
 
-        time_stamp = datetime.now()
-
-        os.makedirs('config', exist_ok=True)  # Ensure the config directory exists
-        with open('config/calib_data.pkl', 'wb') as f:
-            pickle.dump((self.pan_origin, self.tilt_origin, self.rotation_matrix, time_stamp), f)
-            logging.info("Calibration data saved successfully.")
+        # Update config instead of saving to pkl
+        self.config.update_calibration(
+            self.pan_origin,
+            self.tilt_origin,
+            self.rotation_matrix
+        )
 
     def find_closest_points(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         d1 = p2 - p1
