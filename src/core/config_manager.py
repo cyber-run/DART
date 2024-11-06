@@ -50,13 +50,20 @@ class ConfigManager:
         
         # Convert numpy arrays to lists for JSON serialization
         config_copy = self.config.copy()
+        
+        # Only convert to list if it's a numpy array
         if config_copy["calibration"]["pan_origin"] is not None:
-            config_copy["calibration"]["pan_origin"] = self.config["calibration"]["pan_origin"].tolist()
+            if hasattr(config_copy["calibration"]["pan_origin"], 'tolist'):
+                config_copy["calibration"]["pan_origin"] = config_copy["calibration"]["pan_origin"].tolist()
+                
         if config_copy["calibration"]["tilt_origin"] is not None:
-            config_copy["calibration"]["tilt_origin"] = self.config["calibration"]["tilt_origin"].tolist()
+            if hasattr(config_copy["calibration"]["tilt_origin"], 'tolist'):
+                config_copy["calibration"]["tilt_origin"] = config_copy["calibration"]["tilt_origin"].tolist()
+                
         if config_copy["calibration"]["rotation_matrix"] is not None:
-            config_copy["calibration"]["rotation_matrix"] = self.config["calibration"]["rotation_matrix"].tolist()
-            
+            if hasattr(config_copy["calibration"]["rotation_matrix"], 'tolist'):
+                config_copy["calibration"]["rotation_matrix"] = config_copy["calibration"]["rotation_matrix"].tolist()
+                
         with open(self.config_path, 'w') as f:
             json.dump(config_copy, f, indent=4)
     

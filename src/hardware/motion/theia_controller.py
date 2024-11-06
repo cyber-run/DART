@@ -276,6 +276,64 @@ class TheiaController:
         temp = status_string.split(",")
         ret = [int(t.strip()) for t in temp]
         return ret
+
+    def set_absolute_position(self, channel: str, position: int):
+        """Set the current position value for an axis
+        Args:
+            channel (str): The channel to set (A, B)
+            position (int): The absolute position value
+        """
+        self._ser_send(f"G92 {channel}{position}")
+        self.logger.info(f"Set {channel} axis position to {position}")
+
+    def wait_for_motion_complete(self, timeout: int = 10) -> bool:
+        """Wait for all motion to complete
+        Returns:
+            bool: True if motion completed, False if timeout
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            status = self.read_status()
+            # Check motion flags (indices 6,7,8 in status)
+            if not any(status[6:9]):  # If all motion flags are 0
+                return True
+            time.sleep(0.01)
+        return False
+
+    def get_current_positions(self):
+        """Get current zoom and focus positions after ensuring motion is complete
+        Returns:
+            tuple[int, int]: (zoom_position, focus_position)
+        """
+        try:
+            # First read to check motion flags
+            status = self.read_status()
+            
+            # If any motion flags are set, wait for completion
+            if any(status[6:9]):
+                if not self.wait_for_motion_complete():
+                    self.logger.warning("Timeout waiting for motion to complete")
+                    return None, None
+            
+            # Read status again after motion is complete
+            status = self.read_status()
+            
+            # Store positions
+            zoom_pos = status[self.ZOOM_POS]
+            focus_pos = status[self.FOCUS_POS]
+            
+            # Verify positions with a second read
+            verify_status = self.read_status()
+            if (verify_status[self.ZOOM_POS] != zoom_pos or 
+                verify_status[self.FOCUS_POS] != focus_pos):
+                self.logger.warning("Position values unstable between reads")
+                return None, None
+                
+            self.logger.info(f"Verified positions - Zoom: {zoom_pos}, Focus: {focus_pos}")
+            return zoom_pos, focus_pos
+        except Exception as e:
+            self.logger.error(f"Error getting positions: {e}")
+            return None, None
     
 if __name__ == "__main__":
     # Create an instance of TheiaController

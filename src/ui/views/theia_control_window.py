@@ -16,6 +16,14 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         self.resizable(False, False)
         self.configure(fg_color=BG_COLOR)
 
+        # Bind the closing event FIRST before any potential early returns
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.bind("<Destroy>", self.on_destroy)
+        logging.info("Window close protocol bound")
+
+        # Make window modal
+        self.grab_set()
+        
         self.dart = dart_instance
         self.theia = self.dart.theia
 
@@ -32,65 +40,36 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
 
         # Get stored positions from config
         theia_state = self.dart.config.config["devices"]["theia_state"]
+        
+        # Initialize current positions
         self.current_zoom = theia_state["zoom_position"]
         self.current_focus = theia_state["focus_position"]
+        
+        # Set the controller's absolute positions
+        self.theia.set_absolute_position("A", self.current_zoom)
+        self.theia.set_absolute_position("B", self.current_focus)
 
         self.setup_ui()
         
         # Set sliders to current positions
-        self.zoom_slider.set(self.current_zoom * 100 / 50000)  # Convert steps to percentage
-        self.focus_slider.set(self.current_focus * 100 / 133000)
+        self.zoom_slider.set(self.current_zoom)
+        self.focus_slider.set(self.current_focus)
         
         # Update labels
-        self.update_position_display()
-        self.status_label.configure(
-            text=f"Lens Controller Connected",
-            text_color="green"
-        )
-        
+        self.zoom_label.configure(text=f"Zoom: {self.current_zoom} steps")
+        self.focus_label.configure(text=f"Focus: {self.current_focus} steps")
+
     def setup_ui(self):
         """Initialize the UI elements"""
         # Main container
         self.main_frame = ctk.CTkFrame(self, fg_color=TRANSPARENT)
         self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        # Status section
-        self.setup_status_section()
         
         # Controls section
         self.setup_controls_section()
         
         # Home controls section
         self.setup_home_section()
-
-    def setup_status_section(self):
-        """Setup the status display section"""
-        status_frame = ctk.CTkFrame(self.main_frame, fg_color=FRAME_COLOR)
-        status_frame.pack(fill="x", padx=10, pady=10)
-        
-        # Connection status
-        self.status_label = ctk.CTkLabel(
-            status_frame,
-            text=f"Lens Controller Status",
-            font=(GLOBAL_FONT[0], 16, "bold")
-        )
-        self.status_label.pack(pady=5)
-        
-        # Port info
-        port_label = ctk.CTkLabel(
-            status_frame,
-            text=f"Port: {self.dart.config.config['devices']['theia_port']}",
-            font=GLOBAL_FONT
-        )
-        port_label.pack(pady=5)
-        
-        # Current position display
-        self.position_label = ctk.CTkLabel(
-            status_frame,
-            text="Current Position - Zoom: 0%, Focus: 0%",
-            font=GLOBAL_FONT
-        )
-        self.position_label.pack(pady=5)
 
     def setup_controls_section(self):
         """Setup the lens control section"""
@@ -106,13 +85,12 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         self.zoom_slider = ctk.CTkSlider(
             zoom_frame,
             from_=0,
-            to=100,
-            command=self.set_zoom,
-            number_of_steps=100
+            to=50000,
+            command=self.set_zoom
         )
         self.zoom_slider.pack(fill="x", padx=20, pady=5)
         
-        self.zoom_label = ctk.CTkLabel(zoom_frame, text="Zoom: 0%", font=GLOBAL_FONT)
+        self.zoom_label = ctk.CTkLabel(zoom_frame, text="Zoom: 0 steps", font=GLOBAL_FONT)
         self.zoom_label.pack(pady=5)
         
         # Focus controls
@@ -124,14 +102,74 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         self.focus_slider = ctk.CTkSlider(
             focus_frame,
             from_=0,
-            to=100,
-            command=self.set_focus,
-            number_of_steps=100
+            to=65000,
+            command=self.set_focus
         )
         self.focus_slider.pack(fill="x", padx=20, pady=5)
         
-        self.focus_label = ctk.CTkLabel(focus_frame, text="Focus: 0%", font=GLOBAL_FONT)
+        self.focus_label = ctk.CTkLabel(focus_frame, text="Focus: 0 steps", font=GLOBAL_FONT)
         self.focus_label.pack(pady=5)
+
+    def set_zoom(self, value: float):
+        """Set zoom position"""
+        try:
+            if self.theia and self.theia.ser.is_open:
+                new_zoom = int(value)  # Use steps directly
+                self.theia.move_axis("A", new_zoom)  # Use absolute positioning
+                self.current_zoom = new_zoom
+                self.zoom_label.configure(text=f"Zoom: {new_zoom} steps")
+        except Exception as e:
+            logging.error(f"Error setting zoom: {e}")
+
+    def set_focus(self, value: float):
+        """Set focus position"""
+        try:
+            if self.theia and self.theia.ser.is_open:
+                new_focus = int(value)  # Use steps directly
+                self.theia.move_axis("B", new_focus)  # Use absolute positioning
+                self.current_focus = new_focus
+                self.focus_label.configure(text=f"Focus: {new_focus} steps")
+        except Exception as e:
+            logging.error(f"Error setting focus: {e}")
+
+    def on_destroy(self, event):
+        """Handle window destruction"""
+        if event.widget == self:
+            logging.info("Window destroy event triggered")
+            # Call on_closing if it hasn't been called yet
+            if hasattr(self, 'theia'):  # Check if window was properly initialized
+                self.on_closing()
+            self.grab_release()
+            logging.info("Window grab released")
+
+    def on_closing(self):
+        """Save positions before closing"""
+        logging.info("Theia control window closing...")
+        try:
+            if hasattr(self, '_closing_handled'):  # Prevent double execution
+                return
+            self._closing_handled = True
+                
+            if self.theia and self.theia.ser.is_open:
+                logging.info('Getting current lens positions...')
+                zoom_pos, focus_pos = self.theia.get_current_positions()
+                logging.info(f'Current positions - Zoom: {zoom_pos}, Focus: {focus_pos}')
+                
+                if zoom_pos is not None and focus_pos is not None:
+                    logging.info('Updating config with new positions...')
+                    self.dart.config.update_theia_position(
+                        zoom=zoom_pos,
+                        focus=focus_pos
+                    )
+                    logging.info('Config updated successfully')
+                else:
+                    logging.warning('Could not get valid positions from controller')
+        except Exception as e:
+            logging.error(f"Error saving positions: {e}", exc_info=True)
+        finally:
+            logging.info("Destroying Theia control window")
+            self.grab_release()
+            self.destroy()
 
     def setup_home_section(self):
         """Setup the homing controls section"""
@@ -165,66 +203,18 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         )
         self.home_focus_button.pack(side="left", padx=10)
 
-    def update_position_display(self):
-        """Update the position display"""
-        self.position_label.configure(
-            text=f"Current Position - Zoom: {self.current_zoom}%, Focus: {self.current_focus}%"
-        )
-
-    def set_zoom(self, value: float):
-        """Set zoom position"""
-        try:
-            if self.theia and self.theia.ser.is_open:
-                new_zoom = int(value * 50000 / 100)  # Scale to motor steps
-                steps = new_zoom - self.current_zoom  # Calculate relative movement
-                if steps != 0:  # Only move if position changed
-                    self.theia.move_axis("A", steps)
-                    self.current_zoom = new_zoom
-                    self.dart.config.update_theia_position(zoom=self.current_zoom)
-                    self.zoom_label.configure(text=f"Zoom: {int(value)}%")
-                    self.update_position_display()
-            else:
-                self.status_label.configure(text="Error: Lens controller not connected")
-        except Exception as e:
-            logging.error(f"Error setting zoom: {e}")
-            self.status_label.configure(text="Error setting zoom")
-
-    def set_focus(self, value: float):
-        """Set focus position"""
-        try:
-            if self.theia and self.theia.ser.is_open:
-                new_focus = int(value * 133000 / 100)  # Scale to motor steps
-                steps = new_focus - self.current_focus  # Calculate relative movement
-                if steps != 0:  # Only move if position changed
-                    self.theia.move_axis("B", steps)
-                    self.current_focus = new_focus
-                    self.dart.config.update_theia_position(focus=self.current_focus)
-                    self.focus_label.configure(text=f"Focus: {int(value)}%")
-                    self.update_position_display()
-            else:
-                self.status_label.configure(text="Error: Lens controller not connected")
-        except Exception as e:
-            logging.error(f"Error setting focus: {e}")
-            self.status_label.configure(text="Error setting focus")
-
     def home_zoom(self):
         """Home zoom axis"""
         try:
             if self.theia and self.theia.ser.is_open:
                 self.home_zoom_button.configure(state="disabled")
-                self.status_label.configure(text="Homing zoom axis...")
                 self.theia.home_zoom()
                 self.zoom_slider.set(0)
                 self.current_zoom = 0
-                self.zoom_label.configure(text="Zoom: 0%")
-                self.update_position_display()
-                self.status_label.configure(text="Zoom axis homed successfully")
+                self.zoom_label.configure(text=f"Zoom: 0 steps")
                 self.home_zoom_button.configure(state="normal")
-            else:
-                self.status_label.configure(text="Error: Lens controller not connected")
         except Exception as e:
             logging.error(f"Error homing zoom: {e}")
-            self.status_label.configure(text="Error homing zoom")
             self.home_zoom_button.configure(state="normal")
 
     def home_focus(self):
@@ -232,17 +222,11 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         try:
             if self.theia and self.theia.ser.is_open:
                 self.home_focus_button.configure(state="disabled")
-                self.status_label.configure(text="Homing focus axis...")
                 self.theia.home_focus()
                 self.focus_slider.set(0)
                 self.current_focus = 0
-                self.focus_label.configure(text="Focus: 0%")
-                self.update_position_display()
-                self.status_label.configure(text="Focus axis homed successfully")
+                self.focus_label.configure(text=f"Focus: 0 steps")
                 self.home_focus_button.configure(state="normal")
-            else:
-                self.status_label.configure(text="Error: Lens controller not connected")
         except Exception as e:
             logging.error(f"Error homing focus: {e}")
-            self.status_label.configure(text="Error homing focus")
             self.home_focus_button.configure(state="normal")
