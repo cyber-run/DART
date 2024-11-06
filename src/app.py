@@ -592,11 +592,23 @@ class DART:
                 return
 
         # Open window if Theia is connected
-        if not hasattr(self, 'theia_window'):
+        try:
+            # Check if window exists and is valid
+            if hasattr(self, 'theia_window') and self.theia_window.winfo_exists():
+                self.theia_window.lift()  # Bring window to front
+                self.theia_window.focus_force()  # Force focus
+            else:
+                # Create new window
+                self.theia_window = TheiaLensControlWindow(self.window, self)
+                self.theia_window.grab_set()  # Make window modal
+        except Exception as e:
+            logging.error(f"Error managing Theia control window: {e}")
+            # Clean up reference if window is invalid
+            if hasattr(self, 'theia_window'):
+                delattr(self, 'theia_window')
+            # Create new window
             self.theia_window = TheiaLensControlWindow(self.window, self)
-            self.theia_window.grab_set()  # Make window modal
-        else:
-            self.theia_window.focus()  # Bring existing window to front
+            self.theia_window.grab_set()
 
 def get_serial_ports() -> list:
     """Lists available serial ports.

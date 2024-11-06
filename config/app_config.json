@@ -6,7 +6,14 @@
         ],
         "dynamixel_port": "COM5",
         "theia_port": "COM17",
-        "last_detected": null
+        "last_detected": null,
+        "theia_state": {
+            "zoom_position": 0,
+            "focus_position": 0,
+            "absolute_zoom": 0,
+            "absolute_focus": 0,
+            "is_homed": false
+        }
     },
     "calibration": {
         "pan_origin": [
