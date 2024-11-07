@@ -1,4 +1,4 @@
-import logging, asyncio, qtm, time
+import logging, asyncio, qtm
 from threading import Thread
 import tkinter as tk
 from tkinter import ttk
@@ -17,6 +17,8 @@ class QTMStream(Thread):
         """
 
         Thread.__init__(self)
+
+        self.logger = logging.getLogger("QTM")
 
         # QTM Connection vars
         self.qtm_ip = qtm_ip
@@ -53,7 +55,7 @@ class QTMStream(Thread):
         Connect to QTM machine.
         """
         # Establish connection
-        logging.info('[QTM] Connecting to QTM at %s', self.qtm_ip)
+        self.logger.info('Connecting to QTM at %s', self.qtm_ip)
         self._connection = await qtm.connect(self.qtm_ip)
 
         # Register index of body for 3D tracking
@@ -75,7 +77,7 @@ class QTMStream(Thread):
         # If no new component: mark as lost and return from function
         if not new_component:
             if not self.lost:
-                logging.warning('[QTM] 3D Unlabelled marker not found.')
+                self.logger.warning(' 3D Unlabelled marker not found.')
                 self.lost = True
             return
 
@@ -90,13 +92,13 @@ class QTMStream(Thread):
                 pos = new_component[1]
                 self.position2 = [pos.x, pos.y, pos.z]
                 if self.lost:
-                    logging.info('Calibration target detected with two markers.')
+                    self.logger.info('Calibration target detected with two markers.')
                     self.lost = False
             elif not self.lost:
-                logging.info('Calibration target is set but only one marker detected.')
+                self.logger.info('Calibration target is set but only one marker detected.')
                 self.lost = True
         elif self.lost:
-            logging.info('Calibration target detected with one marker.')
+            self.logger.info('Calibration target detected with one marker.')
             self.lost = False
 
     async def _close(self) -> None:
@@ -143,7 +145,7 @@ class QTMControl(Thread):
         """
         Connect to QTM machine and take control.
         """
-        logging.info('[QTM] Connecting to QTM at %s', self.qtm_ip)
+        self.logger.info('Connecting to QTM at %s', self.qtm_ip)
         self._connection = await qtm.connect(self.qtm_ip)
         await self.take_control(self.password)
 

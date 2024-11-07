@@ -9,6 +9,7 @@ class TheiaController:
     Class for controlling the kurokesu lens controller for 1250N6 lens.
     '''
     def __init__(self, port: str, baudrate: int = 115200, timeout: int = 5):
+        self.logger = logging.getLogger("Theia")
         # Initialise serial port
         self.ser = serial.Serial()
         self.ser.port = str(port)
@@ -42,23 +43,6 @@ class TheiaController:
         self.IRIS_PI = 5
         self.IRIS_MOVE = 8
 
-        # Initialize logger
-        self.logger = logging.getLogger("Theia")
-        self.logger.setLevel(logging.INFO)
-
-        # Check if the logger already has handlers
-        if not self.logger.hasHandlers():
-            # Create a console handler
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-
-            # Create a formatter and add it to the handlers
-            formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
-            ch.setFormatter(formatter)
-
-            # Add the handlers to the logger
-            self.logger.addHandler(ch)
-
     def connect(self):
         self.ser.open()
         self.ser.flushInput()
@@ -76,41 +60,41 @@ class TheiaController:
         '''
         # Reset and initialize the controller
         self._ser_send('$B2')
-        self.logger.info("Controller reset and initialized")
+        self.logger.debug("Controller reset and initialized")
 
         # Timing register setup for microstepping DO NOT MODIFY
         self._ser_send("M243 A2")
         self._ser_send("M243 B2")
         self._ser_send("M243 C6")
-        self.logger.info("Timing registers set for microstepping")
+        self.logger.debug("Timing registers set for microstepping")
 
         # Set all channels to normal move
         self._ser_send('M230')
-        self.logger.info("All channels set to normal move")
+        self.logger.debug("All channels set to normal move")
 
         # Set all channels to relative movement mode
         self._ser_send('G90')
-        self.logger.info("All channels set to relative movement mode")
+        self.logger.debug("All channels set to relative movement mode")
 
         # Energize PI leds
         self._ser_send("M238")
-        self.logger.info("PI LEDs energized")
+        self.logger.debug("PI LEDs energized")
 
         # Set motor power
         self._ser_send("M234 A180 B180 C180 D90")
-        self.logger.info("Motor power set")
+        self.logger.debug("Motor power set")
 
         # set motor sleep power
         self._ser_send("M235 A50 B50 C90")
-        self.logger.info("Motor sleep power set")
+        self.logger.debug("Motor sleep power set")
 
         # Set motor drive speed to initalised at 5000
         self._ser_send("M240 A5000 B5000 C2000")
-        self.logger.info("Motor drive speed set to 5000")
+        self.logger.debug("Motor drive speed set to 5000")
 
         # Set PI low/high detection voltage
         self._ser_send("M232 A2000 B2000 C2000 E3000 F3000 G3000")
-        self.logger.info("PI low/high detection voltage set")
+        self.logger.debug("PI low/high detection voltage set")
 
     def read_status(self):
         status_str = self._ser_send("!1")
@@ -120,7 +104,7 @@ class TheiaController:
         self.zoom_pos = self.status[self.ZOOM_POS]
         self.focus_pos = self.status[self.FOCUS_POS]
 
-        self.logger.info(f"Status read: {self.status}")
+        self.logger.debug(f"Status read: {self.status}")
         return self.status
     
     def _wait_till_status_change(self, initial_status: int, axis: int, timeout: int = 10):
@@ -250,10 +234,10 @@ class TheiaController:
     def set_leds(self, mode):
         if mode is True:
             self._ser_send("M238")
-            self.logger.info("LEDs turned on")
+            self.logger.debug("LEDs turned on")
         if mode is False:
             self._ser_send("M239")
-            self.logger.info("LEDs turned off")
+            self.logger.debug("LEDs turned off")
 
     def stop(self):
         # Set all axis to 0

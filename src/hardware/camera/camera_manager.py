@@ -9,6 +9,7 @@ warnings.filterwarnings('ignore')
 class CameraManager:
     """Manages camera operations including live feed and recording."""
     def __init__(self):
+        self.logger = logging.getLogger("Camera")
         self.cap = None
         self.initialize_camera()
 
@@ -40,7 +41,7 @@ class CameraManager:
                 
             self.cap = EasyPySpin.VideoCapture(serial)
             if not self.cap.isOpened():
-                logging.error(f"Failed to open camera {serial}")
+                self.logger.error(f"Failed to open camera {serial}")
                 return False
                 
             # Start acquisition
@@ -48,11 +49,11 @@ class CameraManager:
             
             # Initialize camera properties
             self.initialise_cam_props()
-            logging.info(f"Successfully connected to camera {serial}")
+            self.logger.info(f"Successfully connected to camera {serial}")
             return True
             
         except Exception as e:
-            logging.error(f"Error connecting to camera {serial}: {e}")
+            self.logger.error(f"Error connecting to camera {serial}: {e}")
             return False
             
     def release(self):
@@ -70,17 +71,17 @@ class CameraManager:
                 self.cap.release()
                 self.cap = None
         except Exception as e:
-            logging.error(f"Error releasing camera: {e}")
+            self.logger.error(f"Error releasing camera: {e}")
 
     def initialize_camera(self, camera_index=0):
         try:
             self.cap = EasyPySpin.VideoCapture(camera_index)
             if not self.cap.isOpened():  # Check if the camera has been opened successfully
-                logging.error("Camera could not be opened.")
+                self.logger.error("Camera could not be opened.")
                 return
             self.configure_camera()
         except Exception as e:
-            logging.error(f"Failed to initialize camera: {e}")
+            self.logger.error(f"Failed to initialize camera: {e}")
             self.release()
 
     def configure_camera(self):
@@ -128,13 +129,13 @@ class CameraManager:
 
     def queue_frames(self):
         while self.recording:
-            logging.info("Capturing frame.")
+            self.logger.info("Capturing frame.")
             ret, frame = self.cap.read()
 
             if ret:
                 self.latest_frame = frame
                 self.frame_queue.put(self.latest_frame)
-                logging.info("Queueing frame.")
+                self.logger.info("Queueing frame.")
 
         # Signal the end of the frame queue via sentinel value
         self.frame_queue.put(None)
@@ -145,7 +146,7 @@ class CameraManager:
             if frame is None:
                 break
             if frame.size != 0:
-                logging.info("Writing frame...")
+                self.logger.info("Writing frame...")
                 # Convert ndarray to cv2.imshow compatible format
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 self.writer.write(frame)

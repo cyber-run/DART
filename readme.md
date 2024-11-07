@@ -36,7 +36,7 @@ src/                         # Main source code directory
 ├── tracking/              # Target tracking and calibration
 │   ├── calibrate.py      # System calibration and coordinate transforms
 │   ├── dart_track.py     # Basic tracking implementation
-│   └── dart_track_akf.py # Advanced tracking with Adaptive Kalman Filter
+│   └── kalman_filter.py  # Advanced tracking with Adaptive Kalman Filter
 ├── ui/                    # User interface components
 │   ├── main_window.py    # Main window management and layout
 │   ├── ui_controller.py  # UI state updates and management

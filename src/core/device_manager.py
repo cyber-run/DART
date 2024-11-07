@@ -9,6 +9,7 @@ class DeviceManager:
     """Manages device detection and configuration persistence"""
     def __init__(self, config_manager):
         self.config = config_manager
+        self.logger = logging.getLogger("DeviceManager")
         
     def get_device_config(self) -> Dict:
         """Get current device configuration"""
@@ -21,14 +22,14 @@ class DeviceManager:
     def detect_devices(self) -> Tuple[bool, str]:
         """Detect connected DART devices"""
         try:
-            logging.info("Starting device detection...")
+            self.logger.info("Starting device detection...")
             
             # Look for new devices using stored initial state
             new_ports = set(self.get_com_ports()) - self.initial_ports
             new_cameras = set(self.get_camera_serials()) - self.initial_cameras
             
-            logging.info(f"New ports detected: {new_ports}")
-            logging.info(f"New cameras detected: {new_cameras}")
+            self.logger.info(f"New ports detected: {new_ports}")
+            self.logger.info(f"New cameras detected: {new_cameras}")
             
             # First check if we found both cameras
             if len(new_cameras) != 2:
@@ -41,7 +42,7 @@ class DeviceManager:
             # Identify which port is which
             dyna_port, theia_port = self.identify_com_ports(new_ports)
             
-            logging.info(f"Identified ports - Dyna: {dyna_port}, Theia: {theia_port}")
+            self.logger.info(f"Identified ports - Dyna: {dyna_port}, Theia: {theia_port}")
             
             if dyna_port and theia_port:
                 # Update configuration through config manager
@@ -55,7 +56,7 @@ class DeviceManager:
             return False, "Failed to identify COM ports"
             
         except Exception as e:
-            logging.error(f"Error detecting devices: {e}")
+            self.logger.error(f"Error detecting devices: {e}")
             return False, f"Error during device detection: {str(e)}"
     
     def get_com_ports(self) -> List[str]:
@@ -74,7 +75,7 @@ class DeviceManager:
             cam_list = system.GetCameras()
             num_cameras = cam_list.GetSize()
             
-            logging.info(f"Found {num_cameras} cameras")
+            self.logger.info(f"Found {num_cameras} cameras")
             
             if num_cameras == 0:
                 return []
@@ -98,20 +99,20 @@ class DeviceManager:
                     if PySpin.IsReadable(serial_node):
                         serial_number = serial_node.GetValue()
                         cameras.append(str(serial_number))
-                        logging.info(f"Found camera with serial: {serial_number}")
+                        self.logger.info(f"Found camera with serial: {serial_number}")
                     
                     # Deinitialize camera
                     cam.DeInit()
                     del cam
                     
                 except PySpin.SpinnakerException as e:
-                    logging.error(f"Error accessing camera {i}: {e}")
+                    self.logger.error(f"Error accessing camera {i}: {e}")
                     continue
             
             return cameras
             
         except PySpin.SpinnakerException as e:
-            logging.error(f"Error in PySpin system: {e}")
+            self.logger.error(f"Error in PySpin system: {e}")
             return []
             
         finally:
@@ -122,7 +123,7 @@ class DeviceManager:
                 if system is not None:
                     system.ReleaseInstance()
             except PySpin.SpinnakerException as e:
-                logging.error(f"Error cleaning up PySpin system: {e}")
+                self.logger.error(f"Error cleaning up PySpin system: {e}")
     
     def identify_com_ports(self, ports: set) -> Tuple[Optional[str], Optional[str]]:
         """
@@ -142,16 +143,16 @@ class DeviceManager:
                     dyna_port = port
                     dyna.close_port()
                     remaining_ports.remove(port)
-                    logging.info(f"Identified Dynamixel port: {port}")
+                    self.logger.info(f"Identified Dynamixel port: {port}")
                     break  # Exit loop once Dynamixel is found
             except Exception as e:
-                logging.debug(f"Port {port} is not Dynamixel: {e}")
+                self.logger.debug(f"Port {port} is not Dynamixel: {e}")
                 continue
         
         # If Dynamixel was found and only one port remains, assume it's Theia
         if dyna_port and len(remaining_ports) == 1:
             theia_port = remaining_ports.pop()
-            logging.info(f"Assuming remaining port is Theia: {theia_port}")
+            self.logger.info(f"Assuming remaining port is Theia: {theia_port}")
             return dyna_port, theia_port
         
         # If Dynamixel wasn't found or multiple ports remain, try to identify Theia
@@ -165,7 +166,7 @@ class DeviceManager:
                 status = theia._ser_send("!1")
                 if status:  # Add any specific validation of status format if needed
                     theia_port = port
-                    logging.info(f"Identified Theia port through status check: {port}")
+                    self.logger.info(f"Identified Theia port through status check: {port}")
                 
                 theia.disconnect()
                 
@@ -173,18 +174,18 @@ class DeviceManager:
                     break
                     
             except Exception as e:
-                logging.debug(f"Port {port} is not Theia: {e}")
+                self.logger.debug(f"Port {port} is not Theia: {e}")
                 continue
         
         # Log the final identification results
         if dyna_port and theia_port:
-            logging.info(f"Successfully identified both ports - Dyna: {dyna_port}, Theia: {theia_port}")
+            self.logger.info(f"Successfully identified both ports - Dyna: {dyna_port}, Theia: {theia_port}")
         elif dyna_port:
-            logging.warning("Only Dynamixel port identified")
+            self.logger.warning("Only Dynamixel port identified")
         elif theia_port:
-            logging.warning("Only Theia port identified")
+            self.logger.warning("Only Theia port identified")
         else:
-            logging.error("Failed to identify any ports")
+            self.logger.error("Failed to identify any ports")
             
         return dyna_port, theia_port
     
@@ -209,5 +210,5 @@ class DeviceManager:
             return result
             
         except PySpin.SpinnakerException as e:
-            logging.error(f"Error verifying camera {serial}: {e}")
+            self.logger.error(f"Error verifying camera {serial}: {e}")
             return False

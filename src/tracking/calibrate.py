@@ -1,4 +1,4 @@
-import os, pickle, logging, math
+import logging, math
 import matplotlib.pyplot as plt
 from datetime import datetime
 from typing import Tuple
@@ -6,6 +6,7 @@ import numpy as np
 
 class Calibrator:
     def __init__(self, config_manager):
+        self.logger = logging.getLogger("Calibrator")
         self.config = config_manager
         self.positions = []
         self.calibration_step = 0
@@ -19,9 +20,9 @@ class Calibrator:
         self.calibration_age = self.config.get_calibration_age()
         
         if self.calibrated:
-            logging.info("Calibration data loaded successfully.")
+            self.logger.info("Calibration data loaded successfully.")
         else:
-            logging.info("No calibration data found.")
+            self.logger.info("No calibration data found.")
 
     def run(self, p1: np.ndarray, p2: np.ndarray):
         self.positions.append(p1)
@@ -106,15 +107,15 @@ class Calibrator:
             # Check if the rotation matrix is orthogonal
             is_orthogonal = np.allclose(np.dot(self.rotation_matrix.T, self.rotation_matrix), np.eye(3))
             if not is_orthogonal:
-                logging.warning("The rotation matrix is not orthogonal.")
+                self.logger.warning("The rotation matrix is not orthogonal.")
             else:
-                logging.info("The rotation matrix is orthogonal.")
+                self.logger.info("The rotation matrix is orthogonal.")
         else:
-            logging.info("Rotation matrix not set.")
+            self.logger.info("Rotation matrix not set.")
 
     def plot_calibration(self, p1, p2, p3, p4):
         if self.rotation_matrix is None or self.pan_origin is None:
-            logging.error("Calibration data not available.")
+            self.logger.error("Calibration data not available.")
             return
 
         fig = plt.figure()

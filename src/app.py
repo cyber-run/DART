@@ -1,12 +1,7 @@
 import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
 from utils.misc_funcs import num_to_range
 from utils.perf_timings import perf_counter_ns
-import cProfile, time, cv2, os, asyncio, psutil, signal
+import time, cv2, os, psutil
 from hardware.motion.dyna_controller import DynaController
 from hardware.motion.theia_controller import TheiaController
 from hardware.camera.camera_manager import CameraManager
@@ -14,14 +9,13 @@ from core.image_processor import ImageProcessor
 from CTkMessagebox import CTkMessagebox
 from multiprocessing import Process, Queue, Event
 from data.data_handler import DataHandler
-from tracking.dart_track_akf import dart_track
+from tracking.dart_track import dart_track
 from tracking.calibrate import Calibrator
 import serial.tools.list_ports
 import customtkinter as ctk
 from ui.main_window import MainWindow
 from hardware.mocap.qtm_mocap import *
 from PIL import Image
-import tkinter as tk
 import numpy as np
 from core.state_manager import DARTState
 from ui.ui_controller import UIController
@@ -30,14 +24,9 @@ from core.config_manager import ConfigManager
 from ui.views.theia_control_window import TheiaLensControlWindow
 
 
-
 class DART:
     def __init__(self, window: ctk.CTk):
-        # Set up logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        self.logger = logging.getLogger("DART")
         
         # Initialize configuration first
         self.config = ConfigManager()
@@ -91,7 +80,7 @@ class DART:
                         self.ui_controller.update_camera_status("Connected")
                     else:
                         self.ui_controller.update_camera_status("Failed")
-                        logging.error(f"Failed to connect camera: {serial}")
+                        self.logger.error(f"Failed to connect camera: {serial}")
             
             # Auto-connect Dynamixel if configured
             if device_config["dynamixel_port"]:
@@ -104,7 +93,7 @@ class DART:
                     self.ui_controller.update_motors_status("Connected")
                 else:
                     self.ui_controller.update_motors_status("Failed")
-                    logging.error("Failed to connect to motors")
+                    self.logger.error("Failed to connect to motors")
             
             # Auto-connect Theia if configured
             if device_config["theia_port"]:
@@ -112,13 +101,13 @@ class DART:
                     self.theia = TheiaController(device_config["theia_port"])
                     self.theia.connect()
                     self.theia.initialise()
-                    logging.info(f"Connected to Theia controller on {device_config['theia_port']}")
+                    self.logger.info(f"Connected to Theia controller on {device_config['theia_port']}")
                 except Exception as e:
-                    logging.error(f"Failed to connect to Theia controller: {e}")
+                    self.logger.error(f"Failed to connect to Theia controller: {e}")
                     self.theia = None
                 
         except Exception as e:
-            logging.error(f"Error initializing hardware: {e}")
+            self.logger.error(f"Error initializing hardware: {e}")
             self.ui_controller.update_status_text("Hardware initialization failed")
 
     def toggle_video_feed(self):
@@ -252,7 +241,7 @@ class DART:
                 self.camera_manager.cap.set(cv2.CAP_PROP_GAIN, float(gain_value))
                 self.state.ui.gain_label.configure(text=f"Gain (dB): {round(gain_value, 2)}")
             except AttributeError:
-                logging.error("Gain not set.")
+                self.logger.error("Gain not set.")
 
     def update_fps_label(self):
         if self.camera_manager.cap:
@@ -260,7 +249,7 @@ class DART:
                 fps = self.camera_manager.cap.get(cv2.CAP_PROP_FPS)
                 self.state.ui.fps_label.configure(text=f"FPS: {round(float(fps),2)}")
             except AttributeError:
-                logging.error("FPS not set.")
+                self.logger.error("FPS not set.")
 
     def adjust_exposure(self, exposure_value: float):
         if self.camera_manager.cap:
@@ -269,7 +258,7 @@ class DART:
                 self.state.ui.exposure_label.configure(text=f"Exposure (us): {round(exposure_value, 2)}")
                 self.update_fps_label()
             except AttributeError:
-                logging.error("Exposure not set.")
+                self.logger.error("Exposure not set.")
 
     def update_video_label(self):
         if self.camera_manager.latest_frame is not None:
@@ -296,7 +285,7 @@ class DART:
                 if self.state.hardware.qtm_stream:
                     self.window.after(200, self.update_num_marker_label)
             except Exception as e:
-                logging.error(f"Error updating marker count: {e}")
+                self.logger.error(f"Error updating marker count: {e}")
                 self.ui_controller.update_mocap_status("Error")
 
     def display_frame(self, frame):
@@ -342,16 +331,16 @@ class DART:
                     self.dyna.set_torque(self.dyna.pan_id, self.state.flags['torque'].get())
                     self.dyna.set_torque(self.dyna.tilt_id, self.state.flags['torque'].get())
                     self.ui_controller.update_motors_status("Connected")
-                    logging.info(f"Connected to Dynamixel controller on {dyna_port}")
+                    self.logger.info(f"Connected to Dynamixel controller on {dyna_port}")
                 else:
                     self.ui_controller.update_motors_status("Failed")
-                    logging.error(f"Failed to open port {dyna_port}")
+                    self.logger.error(f"Failed to open port {dyna_port}")
             else:
                 self.ui_controller.update_motors_status("Not Configured")
-                logging.error("Dynamixel port not configured")
+                self.logger.error("Dynamixel port not configured")
         except Exception as e:
             self.ui_controller.update_motors_status("Error")
-            logging.error(f"Error connecting to Dynamixel controller: {e}")
+            self.logger.error(f"Error connecting to Dynamixel controller: {e}")
             self.dyna = None
 
     def update_camera_dropdown(self):
@@ -368,7 +357,7 @@ class DART:
             self.ui_controller.update_camera_status("Connected")
         else:
             self.ui_controller.update_camera_status("Failed")
-            logging.error(f"Failed to connect to camera: {serial}")
+            self.logger.error(f"Failed to connect to camera: {serial}")
 
     def mocap_button_press(self):
         """Handle mocap connection button press"""
@@ -385,17 +374,17 @@ class DART:
                 self.ui_controller.update_mocap_status("Disconnected")
                 self.ui_controller.update_mocap_button("Connect", self.state.get_icon('sync'))
             except Exception as e:
-                logging.error(f"Error disconnecting from QTM: {e}")
+                self.logger.error(f"Error disconnecting from QTM: {e}")
 
     def connect_mocap(self):
         try:
             self.state.hardware.qtm_stream = QTMStream()
             self.state.hardware.qtm_stream.calibration_target = True
             self.ui_controller.update_mocap_status("Connected")
-            logging.info("Connected to QTM.")
+            self.logger.info("Connected to QTM.")
         except Exception as e:
             self.ui_controller.update_mocap_status("Failed")
-            logging.error(f"Error connecting to QTM: {e}")
+            self.logger.error(f"Error connecting to QTM: {e}")
             self.state.hardware.qtm_stream = None
 
     def set_torque(self):
@@ -403,7 +392,7 @@ class DART:
             self.dyna.set_torque(self.dyna.pan_id, self.state.flags['torque'].get())
             self.dyna.set_torque(self.dyna.tilt_id, self.state.flags['torque'].get())
         else:
-            logging.error("Dynamixel controller not connected.")
+            self.logger.error("Dynamixel controller not connected.")
 
     def set_pan(self, value: float):
         if self.dyna is not None:
@@ -413,7 +402,7 @@ class DART:
             angle = num_to_range(self.state.motor['pan_value'], -45, 45, 22.5, 67.5)
             self.dyna.set_pos(1, angle)
         else:
-            logging.error("Dynamixel controller not connected.")
+            self.logger.error("Dynamixel controller not connected.")
 
     def set_tilt(self, value: float):
         if self.dyna is not None:
@@ -427,7 +416,7 @@ class DART:
             angle = num_to_range(self.state.motor['tilt_value'], -45, 45, 22.5, 67.5)
             self.dyna.set_pos(2, angle)
         else:
-            logging.error("Dynamixel controller not connected.")
+            self.logger.error("Dynamixel controller not connected.")
 
     def centre(self):
         """Center both pan and tilt motors"""
@@ -467,7 +456,7 @@ class DART:
             self.window.destroy()
             
         except Exception as e:
-            logging.error(f"Error during cleanup: {e}")
+            self.logger.error(f"Error during cleanup: {e}")
             
         finally:
             # Force exit
@@ -491,13 +480,16 @@ class DART:
             # Schedule next update
             self.window.after(5000, self.get_mem)
         except Exception as e:
-            logging.error(f"Error updating memory usage: {e}")
+            self.logger.error(f"Error updating memory usage: {e}")
 
     def track(self):
         """Handle tracking start/stop"""
         if self.state.tracking['process'] is not None:
             # Stop tracking process
             self.state.stop_tracking()
+
+            # Reload config manager to update theia state
+            self.config.reload_config()
             
             # Only reconnect motor controllers
             try:
@@ -522,7 +514,7 @@ class DART:
                     self.theia.initialise()
                     
             except Exception as e:
-                logging.error(f"Error reconnecting motors: {e}")
+                self.logger.error(f"Error reconnecting motors: {e}")
             
             self.ui_controller.update_track_button("Track", self.state.get_icon('play'))
             return
@@ -538,7 +530,7 @@ class DART:
                     if self.theia.ser.is_open:
                         self.theia.disconnect()
                 except Exception as e:
-                    logging.error(f"Error disconnecting Theia: {e}")
+                    self.logger.error(f"Error disconnecting Theia: {e}")
                 self.theia = None
 
             # Create instance of queue for retrieving data
@@ -558,7 +550,7 @@ class DART:
         else:
             # Add popup window to notify user that DART is not calibrated
             CTkMessagebox(title="Error", message="DART Not Calibrated", icon="cancel")
-            logging.error("DART is not calibrated.")
+            self.logger.error("DART is not calibrated.")
 
     def calibrate(self):
         """Calibrate the system using current positions"""
@@ -568,7 +560,7 @@ class DART:
             self.calibrator.run(p1, p2)
             self.ui_controller.update_calibration_age(int(self.calibrator.calibration_age))
         else:
-            logging.error("QTM stream not available for calibration")
+            self.logger.error("QTM stream not available for calibration")
 
     def open_theia_control_window(self):
         """Open the Theia lens control window"""
@@ -581,9 +573,9 @@ class DART:
                     self.theia = TheiaController(device_config["theia_port"])
                     self.theia.connect()
                     self.theia.initialise()
-                    logging.info(f"Reconnected to Theia controller")
+                    self.logger.info(f"Reconnected to Theia controller")
             except Exception as e:
-                logging.error(f"Failed to connect to Theia controller: {e}")
+                self.logger.error(f"Failed to connect to Theia controller: {e}")
                 CTkMessagebox(
                     title="Error",
                     message="Could not connect to Theia controller. Please check hardware connection.",
@@ -602,7 +594,7 @@ class DART:
                 self.theia_window = TheiaLensControlWindow(self.window, self)
                 self.theia_window.grab_set()  # Make window modal
         except Exception as e:
-            logging.error(f"Error managing Theia control window: {e}")
+            self.logger.error(f"Error managing Theia control window: {e}")
             # Clean up reference if window is invalid
             if hasattr(self, 'theia_window'):
                 delattr(self, 'theia_window')

@@ -8,8 +8,8 @@
         "theia_port": "COM17",
         "last_detected": null,
         "theia_state": {
-            "zoom_position": 18032,
-            "focus_position": 6912,
+            "zoom_position": 22288,
+            "focus_position": 4832,
             "is_homed": false
         }
     },
@@ -43,5 +43,8 @@
         ],
         "timestamp": "2024-10-08T18:40:32.320533",
         "is_calibrated": true
+    },
+    "tracking": {
+        "use_kalman": false
     }
 }

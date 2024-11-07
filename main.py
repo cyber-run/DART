@@ -1,4 +1,13 @@
 # main.py
+import logging
+# Configure logging for all modules
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+
+
 import sys
 from pathlib import Path
 import customtkinter as ctk

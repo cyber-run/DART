@@ -1,4 +1,4 @@
-import threading, time, math, logging, cProfile
+import threading, time, math, logging
 from utils.misc_funcs import set_realtime_priority
 from typing import Dict, Tuple
 from dynamixel_sdk import *
@@ -7,6 +7,7 @@ import numpy as np
 
 class DynaController:
     def __init__(self, com_port: str = 'COM5', baud_rate: int = 4000000) -> None:
+        self.logger = logging.getLogger("Dyna")
         # EEPROM addresses for X-series:
         self.X_TORQUE_ENABLE = 64       # Torque enable
         self.X_OP_MODE = 11             # Operating mode
@@ -54,7 +55,7 @@ class DynaController:
         for motor_id in [self.pan_id, self.tilt_id]:
             dxl_addparam_result = self.pos_sync_read.addParam(motor_id)
             if dxl_addparam_result != True:
-                logging.error("[ID:%03d] groupSyncRead addparam failed" % motor_id)
+                self.logger.debug("[ID:%03d] groupSyncRead addparam failed" % motor_id)
                 quit()
 
         # Initialize GroupSyncWrite instance
@@ -80,19 +81,19 @@ class DynaController:
 
         try:
             if self.port_handler.openPort():
-                logging.info("Succeeded to open the port")
+                self.logger.info("Succeeded to open the port")
             else:
-                logging.error("Failed to open the port")
+                self.logger.debug("Failed to open the port")
                 return False
 
             if self.port_handler.setBaudRate(self.baud):
-                logging.info("Succeeded to change the baudrate")
+                self.logger.debug("Succeeded to change the baudrate")
             else:
-                logging.error("Failed to change the baudrate")
+                self.logger.debug("Failed to change the baudrate")
                 return False
             return True
         except Exception as e:
-            print(f"Error opening port: {e}")
+            self.logger.debug(f"Error opening port: {e}")
             return False
 
     def set_sync_current(self, pan_current: int, tilt_current: int) -> None:
@@ -117,7 +118,7 @@ class DynaController:
         # Execute sync write
         dxl_comm_result = current_sync_write.txPacket()
         if dxl_comm_result != COMM_SUCCESS:
-            logging.error(f"Failed to set sync current: {self.packet_handler.getTxRxResult(dxl_comm_result)}")
+            self.logger.debug(f"Failed to set sync current: {self.packet_handler.getTxRxResult(dxl_comm_result)}")
         
         # Clear sync write parameter storage
         current_sync_write.clearParam()
@@ -139,8 +140,8 @@ class DynaController:
         # Execute sync read
         dxl_comm_result = current_sync_read.txRxPacket()
         if dxl_comm_result != COMM_SUCCESS:
-            logging.error(f"Failed to get sync current: {self.packet_handler.getTxRxResult(dxl_comm_result)}")
-            return (-1, -1)  # Indicate an error
+            self.logger.debug(f"Failed to get sync current: {self.packet_handler.getTxRxResult(dxl_comm_result)}")
+            return (-1, -1)  # Indicate an debug
 
         # Retrieve the data
         pan_current = current_sync_read.getData(self.pan_id, self.X_GET_CURRENT, 2)
@@ -165,7 +166,7 @@ class DynaController:
         '''
         # Convert from degrees to encoder position
         pos = int(pos * 4095 / 360)
-        logging.debug(f"Setting motor {motor_id} position to {pos} ticks")
+        self.logger.debug(f"Setting motor {motor_id} position to {pos} ticks")
         # Write to servo
         self.write4ByteData(motor_id, self.X_SET_POS, pos)
 
@@ -240,7 +241,7 @@ class DynaController:
         # Perform sync read
         dxl_comm_result = self.pos_sync_read.txRxPacket()
         if dxl_comm_result != COMM_SUCCESS:
-            logging.error(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
 
         # Retrieve the data
         pan_pos = self.pos_sync_read.getData(self.pan_id, self.X_GET_POS, 4)
@@ -391,31 +392,31 @@ class DynaController:
     def write1ByteData(self, motor_id, address, value):
         dxl_comm_result, dxl_error = self.packet_handler.write1ByteTxRx(self.port_handler, motor_id, address, value)
         if dxl_comm_result != COMM_SUCCESS:
-            logging.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
         elif dxl_error != 0:
-            logging.error(self.packet_handler.getRxPacketError(dxl_error))
+            self.logger.debug(self.packet_handler.getRxPacketError(dxl_error))
 
     def write2ByteData(self, motor_id, address, value):
         dxl_comm_result, dxl_error = self.packet_handler.write2ByteTxRx(self.port_handler, motor_id, address, value)
         if dxl_comm_result != COMM_SUCCESS:
-            logging.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
         elif dxl_error != 0:
-            logging.error(self.packet_handler.getRxPacketError(dxl_error))
+            self.logger.debug(self.packet_handler.getRxPacketError(dxl_error))
 
     def write4ByteData(self, motor_id, address, value):
         dxl_comm_result, dxl_error = self.packet_handler.write4ByteTxRx(self.port_handler, motor_id, address, value)
         if dxl_comm_result != COMM_SUCCESS:
-            logging.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
         elif dxl_error != 0:
-            logging.error(self.packet_handler.getRxPacketError(dxl_error))
+            self.logger.debug(self.packet_handler.getRxPacketError(dxl_error))
 
     def read1ByteData(self, motor_id, address):
         dxl_data, dxl_comm_result, dxl_error = self.packet_handler.read1ByteTxRx(self.port_handler, motor_id, address)
         if dxl_comm_result != COMM_SUCCESS:
-            logging.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
             return None
         elif dxl_error != 0:
-            logging.error(self.packet_handler.getRxPacketError(dxl_error))
+            self.logger.debug(self.packet_handler.getRxPacketError(dxl_error))
             return None
         else:
             return dxl_data
@@ -423,10 +424,10 @@ class DynaController:
     def read2ByteData(self, motor_id, address):
         dxl_data, dxl_comm_result, dxl_error = self.packet_handler.read2ByteTxRx(self.port_handler, motor_id, address)
         if dxl_comm_result != COMM_SUCCESS:
-            logging.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
             return None
         elif dxl_error != 0:
-            logging.error(self.packet_handler.getRxPacketError(dxl_error))
+            self.logger.debug(self.packet_handler.getRxPacketError(dxl_error))
             return None
         else:
             return dxl_data
@@ -434,10 +435,10 @@ class DynaController:
     def read4ByteData(self, motor_id, address):
         dxl_data, dxl_comm_result, dxl_error = self.packet_handler.read4ByteTxRx(self.port_handler, motor_id, address)
         if dxl_comm_result != COMM_SUCCESS:
-            logging.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
             return None
         elif dxl_error != 0:
-            logging.error(self.packet_handler.getRxPacketError(dxl_error))
+            self.logger.debug(self.packet_handler.getRxPacketError(dxl_error))
             return None
         else:
             return dxl_data

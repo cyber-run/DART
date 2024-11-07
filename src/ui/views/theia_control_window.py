@@ -11,15 +11,16 @@ TRANSPARENT = "transparent"  # For nested frames that should inherit parent colo
 class TheiaLensControlWindow(ctk.CTkToplevel):
     def __init__(self, master, dart_instance):
         super().__init__(master)
+        self.logger = logging.getLogger("TheiaLensControlWindow")
         self.title("Theia Lens Control")
-        self.geometry("600x800")
+        self.geometry("600x400")
         self.resizable(False, False)
         self.configure(fg_color=BG_COLOR)
 
         # Bind the closing event FIRST before any potential early returns
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Destroy>", self.on_destroy)
-        logging.info("Window close protocol bound")
+        self.logger.debug("Window close protocol bound")
 
         # Make window modal
         self.grab_set()
@@ -29,7 +30,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
 
         # Check Theia connection status
         if not self.theia or not hasattr(self.theia, 'ser') or not self.theia.ser.is_open:
-            logging.error("Theia controller not properly initialized")
+            self.logger.error("Theia controller not properly initialized")
             CTkMessagebox(
                 title="Error",
                 message="Theia controller not connected. Please check hardware connection.",
@@ -119,7 +120,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
                 self.current_zoom = new_zoom
                 self.zoom_label.configure(text=f"Zoom: {new_zoom} steps")
         except Exception as e:
-            logging.error(f"Error setting zoom: {e}")
+            self.logger.error(f"Error setting zoom: {e}")
 
     def set_focus(self, value: float):
         """Set focus position"""
@@ -130,44 +131,44 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
                 self.current_focus = new_focus
                 self.focus_label.configure(text=f"Focus: {new_focus} steps")
         except Exception as e:
-            logging.error(f"Error setting focus: {e}")
+            self.logger.error(f"Error setting focus: {e}")
 
     def on_destroy(self, event):
         """Handle window destruction"""
         if event.widget == self:
-            logging.info("Window destroy event triggered")
+            self.logger.debug("Window destroy event triggered")
             # Call on_closing if it hasn't been called yet
             if hasattr(self, 'theia'):  # Check if window was properly initialized
                 self.on_closing()
             self.grab_release()
-            logging.info("Window grab released")
+            self.logger.debug("Window grab released")
 
     def on_closing(self):
         """Save positions before closing"""
-        logging.info("Theia control window closing...")
+        self.logger.debug("Theia control window closing...")
         try:
             if hasattr(self, '_closing_handled'):  # Prevent double execution
                 return
             self._closing_handled = True
                 
             if self.theia and self.theia.ser.is_open:
-                logging.info('Getting current lens positions...')
+                self.logger.debug('Getting current lens positions...')
                 zoom_pos, focus_pos = self.theia.get_current_positions()
-                logging.info(f'Current positions - Zoom: {zoom_pos}, Focus: {focus_pos}')
+                self.logger.info(f'Current positions - Zoom: {zoom_pos}, Focus: {focus_pos}')
                 
                 if zoom_pos is not None and focus_pos is not None:
-                    logging.info('Updating config with new positions...')
+                    self.logger.debug('Updating config with new positions...')
                     self.dart.config.update_theia_position(
                         zoom=zoom_pos,
                         focus=focus_pos
                     )
-                    logging.info('Config updated successfully')
+                    self.logger.info('Config updated successfully')
                 else:
-                    logging.warning('Could not get valid positions from controller')
+                    self.logger.warning('Could not get valid positions from controller')
         except Exception as e:
-            logging.error(f"Error saving positions: {e}", exc_info=True)
+            self.logger.error(f"Error saving positions: {e}", exc_info=True)
         finally:
-            logging.info("Destroying Theia control window")
+            self.logger.debug("Destroying Theia control window")
             self.grab_release()
             self.destroy()
 
@@ -214,7 +215,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
                 self.zoom_label.configure(text=f"Zoom: 0 steps")
                 self.home_zoom_button.configure(state="normal")
         except Exception as e:
-            logging.error(f"Error homing zoom: {e}")
+            self.logger.error(f"Error homing zoom: {e}")
             self.home_zoom_button.configure(state="normal")
 
     def home_focus(self):
@@ -228,5 +229,5 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
                 self.focus_label.configure(text=f"Focus: 0 steps")
                 self.home_focus_button.configure(state="normal")
         except Exception as e:
-            logging.error(f"Error homing focus: {e}")
+            self.logger.error(f"Error homing focus: {e}")
             self.home_focus_button.configure(state="normal")

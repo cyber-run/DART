@@ -10,6 +10,7 @@ class ConfigManager:
     def __init__(self, config_path: str = "config/app_config.json"):
         self.config_path = Path(config_path)
         self.config = self.load_config()
+        self.logger = logging.getLogger("ConfigManager")
         
     def get_default_config(self) -> Dict:
         """Return default configuration"""
@@ -30,6 +31,9 @@ class ConfigManager:
                 "rotation_matrix": None,
                 "timestamp": None,
                 "is_calibrated": False
+            },
+            "tracking": {
+                "use_kalman": True  # Default to using Kalman filter
             }
         }
     
@@ -40,10 +44,14 @@ class ConfigManager:
                 with open(self.config_path, 'r') as f:
                     return json.load(f)
             except json.JSONDecodeError:
-                logging.error("Invalid configuration file")
+                self.logger.error("Invalid configuration file")
                 return self.get_default_config()
         return self.get_default_config()
     
+    def reload_config(self) -> None:
+        """Reload configuration from JSON file"""
+        self.config = self.load_config()
+        
     def save_config(self) -> None:
         """Save configuration to JSON file"""
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
