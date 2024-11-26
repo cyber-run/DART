@@ -3,6 +3,7 @@ __pycache__/
 **/__pycache__/
 *.py[cod]
 *$py.class
+venv310/
 
 # Virtual environments
 .venv/
@@ -13,19 +14,19 @@ env.bak/
 venv.bak/
 venv38/
 .Python
+static/recordings/
 
 # Project-specific directories
-/dev/__pycache__/
-/dev/recordings
+/__pycache__/
+/recordings
 /test/
-/dev/output
+/output
 /calibration_images/
 /calibration_data.npz
 /misc/
 /static/ffmpeg/
 /yolo_test
-/local
-/src
+/_local
 
 # C extensions
 *.so
