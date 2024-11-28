@@ -8,10 +8,10 @@ warnings.filterwarnings('ignore')
 
 class CameraManager:
     """Manages camera operations including live feed and recording."""
-    def __init__(self):
+    def __init__(self, camera_index=0):
         self.logger = logging.getLogger("Camera")
         self.cap = None
-        self.initialize_camera()
+        self.initialize_camera(camera_index)
 
         # Initialize video recording params
         self.frame_queue = Queue()

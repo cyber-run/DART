@@ -44,14 +44,11 @@ class Calibrator:
 
     def calibrate(self, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, 
                  p4: np.ndarray, p5: np.ndarray, p6: np.ndarray):
-        x1, x2 = self.find_closest_points(p1, p2, p3, p4)
-        self.pan_origin = self.calculate_midpoint(x1, x2)
-
         x3, x4 = self.find_closest_points(p1, p2, p5, p6)
         self.tilt_origin = self.calculate_midpoint(x3, x4)
 
-        vec1 = (p1 + p2) / 2 - self.pan_origin
-        vec2 = (p3 + p4) / 2 - self.pan_origin
+        vec1 = (p1 + p2) / 2 - self.tilt_origin
+        vec2 = (p5 + p6) / 2 - self.tilt_origin
 
         vec1_normalized = vec1 / np.linalg.norm(vec1)
         vec2_normalized = vec2 / np.linalg.norm(vec2)

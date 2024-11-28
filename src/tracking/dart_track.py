@@ -25,7 +25,7 @@ class DynaTracker:
         self.logger = logging.getLogger("Track")
         # Configure logging for this process with a console handler
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.ERROR,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%H:%M:%S'
         )
@@ -189,7 +189,12 @@ class DynaTracker:
         
         # Get the current angles of the dynamixels
         encoder_pan_angle, encoder_tilt_angle = self.dyna.get_sync_pos()
-
+        
+        # Add error handling for None values
+        if encoder_pan_angle is None or encoder_tilt_angle is None:
+            self.logger.info("Failed to read encoder angles")
+            return  # Skip data collection for this iteration
+        
         # Put the data into the queue in a non-blocking way
         data = (
             estimated_position,

@@ -99,7 +99,8 @@ class DataHandler:
         combined_table = pa.concat_tables(tables)
         pq.write_table(combined_table, self.merged_file_path)
 
-        print(f"Merged {len(parquet_files)} files into {self.merged_file_path}.")
+        # replace with log 
+        # print(f"Merged {len(parquet_files)} files into {self.merged_file_path}.")
 
         for file in parquet_files:
             file.unlink()

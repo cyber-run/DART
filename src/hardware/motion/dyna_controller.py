@@ -241,11 +241,22 @@ class DynaController:
         # Perform sync read
         dxl_comm_result = self.pos_sync_read.txRxPacket()
         if dxl_comm_result != COMM_SUCCESS:
-            self.logger.debug(self.packet_handler.getTxRxResult(dxl_comm_result))
+            self.logger.info(f"Failed to sync read: {self.packet_handler.getTxRxResult(dxl_comm_result)}")
+            return None, None
+        
+        # Check if data is available for both motors
+        if not (self.pos_sync_read.isAvailable(self.pan_id, self.X_GET_POS, 4) and 
+                self.pos_sync_read.isAvailable(self.tilt_id, self.X_GET_POS, 4)):
+            self.logger.info("Sync read data not available")
+            return None, None
 
         # Retrieve the data
-        pan_pos = self.pos_sync_read.getData(self.pan_id, self.X_GET_POS, 4)
-        tilt_pos = self.pos_sync_read.getData(self.tilt_id, self.X_GET_POS, 4)
+        try:
+            pan_pos = self.pos_sync_read.getData(self.pan_id, self.X_GET_POS, 4)
+            tilt_pos = self.pos_sync_read.getData(self.tilt_id, self.X_GET_POS, 4)
+        except IndexError:
+            self.logger.info("Failed to get motor data")
+            return None, None
 
         # Convert from ticks to degrees
         pan_pos_deg = self.convert_ticks_to_degrees(pan_pos)
