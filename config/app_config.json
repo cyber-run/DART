@@ -4,12 +4,12 @@
             "24211773",
             "23473307"
         ],
-        "dynamixel_port": "COM5",
-        "theia_port": "COM17",
+        "dynamixel_port": "COM17",
+        "theia_port": "COM5",
         "last_detected": null,
         "theia_state": {
             "zoom_position": 22288,
-            "focus_position": 4832,
+            "focus_position": 2736,
             "is_homed": false
         }
     },

@@ -6,7 +6,7 @@ import numpy as np
 
 
 class DynaController:
-    def __init__(self, com_port: str = 'COM5', baud_rate: int = 4000000) -> None:
+    def __init__(self, com_port: str = 'COM5', baud_rate: int = 3000000) -> None:
         self.logger = logging.getLogger("Dyna")
         # EEPROM addresses for X-series:
         self.X_TORQUE_ENABLE = 64       # Torque enable

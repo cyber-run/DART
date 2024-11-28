@@ -45,20 +45,24 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         # Initialize current positions
         self.current_zoom = theia_state["zoom_position"]
         self.current_focus = theia_state["focus_position"]
+        self.current_iris = theia_state.get("iris_position", 0)  # Default to 0 if not set
         
         # Set the controller's absolute positions
         self.theia.set_absolute_position("A", self.current_zoom)
         self.theia.set_absolute_position("B", self.current_focus)
+        self.theia.set_absolute_position("C", self.current_iris)
 
         self.setup_ui()
         
-        # Set sliders to current positions
+        # Update initial positions
         self.zoom_slider.set(self.current_zoom)
         self.focus_slider.set(self.current_focus)
+        self.iris_spinbox.set(self.current_iris)
         
         # Update labels
         self.zoom_label.configure(text=f"Zoom: {self.current_zoom} steps")
         self.focus_label.configure(text=f"Focus: {self.current_focus} steps")
+        self.iris_label.configure(text=f"Iris: {self.current_iris} steps")
 
     def setup_ui(self):
         """Initialize the UI elements"""
@@ -110,6 +114,46 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         
         self.focus_label = ctk.CTkLabel(focus_frame, text="Focus: 0 steps", font=GLOBAL_FONT)
         self.focus_label.pack(pady=5)
+        
+        # Iris controls
+        iris_frame = ctk.CTkFrame(controls_frame, fg_color=TRANSPARENT)
+        iris_frame.pack(fill="x", padx=10, pady=10)
+        
+        ctk.CTkLabel(iris_frame, text="Aperture Control", font=(GLOBAL_FONT[0], 14, "bold")).pack()
+        
+        iris_control_frame = ctk.CTkFrame(iris_frame, fg_color=TRANSPARENT)
+        iris_control_frame.pack(fill="x", padx=20, pady=5)
+        
+        # Add decrease button
+        self.iris_dec_button = ctk.CTkButton(
+            iris_control_frame,
+            text="-",
+            command=lambda: self.adjust_iris(-10),
+            width=30
+        )
+        self.iris_dec_button.pack(side="left", padx=5)
+        
+        # Add spinbox
+        self.iris_spinbox = ctk.CTkSpinbox(
+            iris_control_frame,
+            from_=0,
+            to=150,
+            command=self.set_iris,
+            width=120
+        )
+        self.iris_spinbox.pack(side="left", padx=5)
+        
+        # Add increase button
+        self.iris_inc_button = ctk.CTkButton(
+            iris_control_frame,
+            text="+",
+            command=lambda: self.adjust_iris(10),
+            width=30
+        )
+        self.iris_inc_button.pack(side="left", padx=5)
+        
+        self.iris_label = ctk.CTkLabel(iris_frame, text="Iris: 0 steps", font=GLOBAL_FONT)
+        self.iris_label.pack(pady=5)
 
     def set_zoom(self, value: float):
         """Set zoom position"""
@@ -132,6 +176,34 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
                 self.focus_label.configure(text=f"Focus: {new_focus} steps")
         except Exception as e:
             self.logger.error(f"Error setting focus: {e}")
+
+    def adjust_iris(self, delta: int):
+        """Adjust iris position by delta steps"""
+        try:
+            if self.theia and self.theia.ser.is_open:
+                current = int(self.iris_spinbox.get())
+                new_iris = max(0, min(150, current + delta))  # Clamp between 0-150
+                self.iris_spinbox.set(str(new_iris))
+                self.set_iris(str(new_iris))
+        except Exception as e:
+            self.logger.error(f"Error adjusting iris: {e}")
+
+    def set_iris(self, value: str):
+        """Set iris position"""
+        try:
+            if self.theia and self.theia.ser.is_open:
+                new_iris = int(float(value))  # Convert string to int
+                if 0 <= new_iris <= 150:  # Add bounds checking
+                    self.theia.move_axis("C", new_iris)
+                    self.current_iris = new_iris
+                    self.iris_label.configure(text=f"Iris: {new_iris} steps")
+                else:
+                    self.logger.warning(f"Iris value {new_iris} out of range")
+                    # Reset to valid value
+                    new_iris = max(0, min(150, new_iris))
+                    self.iris_spinbox.set(str(new_iris))
+        except Exception as e:
+            self.logger.error(f"Error setting iris: {e}")
 
     def on_destroy(self, event):
         """Handle window destruction"""

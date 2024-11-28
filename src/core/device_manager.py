@@ -125,6 +125,13 @@ class DeviceManager:
             except PySpin.SpinnakerException as e:
                 self.logger.error(f"Error cleaning up PySpin system: {e}")
     
+    def get_initial_state(self) -> None:
+        """Store initial state of COM ports and cameras before device detection"""
+        self.logger.info("Taking initial snapshot of system state...")
+        self.initial_ports = set(self.get_com_ports())
+        self.initial_cameras = set(self.get_camera_serials())
+        self.logger.info(f"Initial state - Ports: {self.initial_ports}, Cameras: {self.initial_cameras}")
+    
     def identify_com_ports(self, ports: set) -> Tuple[Optional[str], Optional[str]]:
         """
         Identify which COM port is for Dynamixel and which is for Theia

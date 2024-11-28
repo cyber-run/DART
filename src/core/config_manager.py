@@ -22,7 +22,8 @@ class ConfigManager:
                 "last_detected": None,
                 "theia_state": {
                     "zoom_position": 0,
-                    "focus_position": 0
+                    "focus_position": 0,
+                    "iris_position": 0
                 }
             },
             "calibration": {
@@ -114,12 +115,13 @@ class ConfigManager:
             np.array(cal["rotation_matrix"])
         )
     
-    def update_theia_position(self, zoom: int = None, focus: int = None) -> None:
+    def update_theia_position(self, zoom: int = None, focus: int = None, iris: int = None) -> None:
         """Update stored Theia lens positions"""
         if "theia_state" not in self.config["devices"]:
             self.config["devices"]["theia_state"] = {
                 "zoom_position": 0,
                 "focus_position": 0,
+                "iris_position": 0,
                 "is_homed": False  # Track whether axes have been homed
             }
             
@@ -127,6 +129,10 @@ class ConfigManager:
             self.config["devices"]["theia_state"]["zoom_position"] = zoom
         if focus is not None:
             self.config["devices"]["theia_state"]["focus_position"] = focus
+        if iris is not None:
+            # Ensure iris value is within valid range
+            iris = max(0, min(150, iris))
+            self.config["devices"]["theia_state"]["iris_position"] = iris
         self.save_config()
 
     def set_theia_homed(self, axis: str, status: bool = True) -> None:
