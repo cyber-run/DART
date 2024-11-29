@@ -6,7 +6,7 @@ from ui.components.menu_bar import MenuBar
 from hardware.motion.theia_controller import TheiaController
 from ui.views.theia_control_window import TheiaLensControlWindow
 import logging
-from PyQt5.QtWidgets import QMessageBox
+from CTkMessagebox import CTkMessagebox
 
 class MainWindow:
     """Manages the main application window and its layout components."""
@@ -109,11 +109,10 @@ class MainWindow:
                     logging.info(f"Reconnected to Theia controller")
             except Exception as e:
                 logging.error(f"Failed to connect to Theia controller: {e}")
-                QMessageBox.critical(
-                    self.window,
-                    "Error",
-                    "Could not connect to Theia controller. Please check hardware connection.",
-                    QMessageBox.Ok
+                CTkMessagebox(
+                    title="Error",
+                    message="Could not connect to Theia controller. Please check hardware connection.",
+                    icon="cancel"
                 )
                 return
 

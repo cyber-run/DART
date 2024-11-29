@@ -57,7 +57,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         # Update initial positions
         self.zoom_slider.set(self.current_zoom)
         self.focus_slider.set(self.current_focus)
-        self.iris_spinbox.set(self.current_iris)
+        self.iris_entry.insert(0, str(self.current_iris))
         
         # Update labels
         self.zoom_label.configure(text=f"Zoom: {self.current_zoom} steps")
@@ -124,28 +124,32 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         iris_control_frame = ctk.CTkFrame(iris_frame, fg_color=TRANSPARENT)
         iris_control_frame.pack(fill="x", padx=20, pady=5)
         
+        # Button frame for better alignment
+        button_frame = ctk.CTkFrame(iris_control_frame, fg_color=TRANSPARENT)
+        button_frame.pack(expand=True)
+        
         # Add decrease button
         self.iris_dec_button = ctk.CTkButton(
-            iris_control_frame,
+            button_frame,
             text="-",
             command=lambda: self.adjust_iris(-10),
             width=30
         )
         self.iris_dec_button.pack(side="left", padx=5)
         
-        # Add spinbox
-        self.iris_spinbox = ctk.CTkSpinbox(
-            iris_control_frame,
-            from_=0,
-            to=150,
-            command=self.set_iris,
-            width=120
+        # Add entry field
+        self.iris_entry = ctk.CTkEntry(
+            button_frame,
+            width=60,
+            justify="center"
         )
-        self.iris_spinbox.pack(side="left", padx=5)
+        self.iris_entry.pack(side="left", padx=5)
+        self.iris_entry.bind("<Return>", lambda e: self.set_iris(self.iris_entry.get()))
+        self.iris_entry.bind("<FocusOut>", lambda e: self.set_iris(self.iris_entry.get()))
         
         # Add increase button
         self.iris_inc_button = ctk.CTkButton(
-            iris_control_frame,
+            button_frame,
             text="+",
             command=lambda: self.adjust_iris(10),
             width=30
@@ -181,9 +185,10 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         """Adjust iris position by delta steps"""
         try:
             if self.theia and self.theia.ser.is_open:
-                current = int(self.iris_spinbox.get())
-                new_iris = max(0, min(150, current + delta))  # Clamp between 0-150
-                self.iris_spinbox.set(str(new_iris))
+                current = int(float(self.iris_entry.get() or "0"))
+                new_iris = max(0, min(200, current + delta))  # Clamp between 0-200
+                self.iris_entry.delete(0, "end")
+                self.iris_entry.insert(0, str(new_iris))
                 self.set_iris(str(new_iris))
         except Exception as e:
             self.logger.error(f"Error adjusting iris: {e}")
@@ -192,16 +197,20 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         """Set iris position"""
         try:
             if self.theia and self.theia.ser.is_open:
-                new_iris = int(float(value))  # Convert string to int
-                if 0 <= new_iris <= 150:  # Add bounds checking
+                new_iris = int(float(value or "0"))  # Convert string to int, default to 0 if empty
+                if 0 <= new_iris <= 200:  # Add bounds checking
                     self.theia.move_axis("C", new_iris)
                     self.current_iris = new_iris
                     self.iris_label.configure(text=f"Iris: {new_iris} steps")
+                    # Update entry if value was clamped
+                    self.iris_entry.delete(0, "end")
+                    self.iris_entry.insert(0, str(new_iris))
                 else:
                     self.logger.warning(f"Iris value {new_iris} out of range")
                     # Reset to valid value
-                    new_iris = max(0, min(150, new_iris))
-                    self.iris_spinbox.set(str(new_iris))
+                    new_iris = max(0, min(200, new_iris))
+                    self.iris_entry.delete(0, "end")
+                    self.iris_entry.insert(0, str(new_iris))
         except Exception as e:
             self.logger.error(f"Error setting iris: {e}")
 
@@ -226,13 +235,15 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
             if self.theia and self.theia.ser.is_open:
                 self.logger.debug('Getting current lens positions...')
                 zoom_pos, focus_pos = self.theia.get_current_positions()
-                self.logger.info(f'Current positions - Zoom: {zoom_pos}, Focus: {focus_pos}')
+                iris_pos = self.current_iris  # Get current iris position
+                self.logger.info(f'Current positions - Zoom: {zoom_pos}, Focus: {focus_pos}, Iris: {iris_pos}')
                 
                 if zoom_pos is not None and focus_pos is not None:
                     self.logger.debug('Updating config with new positions...')
                     self.dart.config.update_theia_position(
                         zoom=zoom_pos,
-                        focus=focus_pos
+                        focus=focus_pos,
+                        iris=iris_pos
                     )
                     self.logger.info('Config updated successfully')
                 else:

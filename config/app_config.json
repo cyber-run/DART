@@ -9,8 +9,9 @@
         "last_detected": null,
         "theia_state": {
             "zoom_position": 22288,
-            "focus_position": 2736,
-            "is_homed": false
+            "focus_position": 3792,
+            "is_homed": false,
+            "iris_position": 0
         }
     },
     "calibration": {
