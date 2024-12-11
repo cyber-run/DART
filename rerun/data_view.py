@@ -208,22 +208,46 @@ rr.log("World/camera_frustum",
     timeless=True
 )
 
-# Set the camera transform
-rr.log("World/camera_frustum",
-    rr.Transform3D(
+# Create list to store transforms
+transforms = []
+
+# Generate transforms for each timestamp
+for pan_angle, tilt_angle in zip(df['encoder_pan'], df['encoder_tilt']):
+    # First apply the base camera orientation
+    base_rotation = Rotation.from_matrix(camera_rotation)
+    
+    # Convert encoder angles to optical angles
+    optical_pan = (pan_angle - 45) * 2   # negative = left, positive = right
+    optical_tilt = (tilt_angle - 45) * 2  # negative = down, positive = up
+    
+    # Pan is around Y axis (left-right rotation)
+    pan_rot = Rotation.from_euler('y', optical_pan, degrees=True)
+    
+    # Apply pan rotation after base rotation
+    intermediate_rot = base_rotation * pan_rot
+    
+    # Tilt is around X axis (up-down rotation)
+    tilt_rot = Rotation.from_euler('x', optical_tilt, degrees=True)
+    
+    # Apply tilt rotation last
+    final_rotation = intermediate_rot * tilt_rot
+    
+    # Convert to axis-angle for Rerun
+    axis_angle = final_rotation.as_rotvec()
+    angle = np.linalg.norm(axis_angle)
+    axis = axis_angle / angle if angle > 0 else np.array([0, 0, 1])
+    
+    # Create transform
+    transform = rr.Transform3D(
         translation=tilt_origin.tolist(),
         rotation=rr.RotationAxisAngle(
             axis=axis.tolist(),
             radians=float(angle)
         )
-    ),
-    timeless=True
-)
+    )
+    transforms.append(transform)
 
-# Add a small coordinate frame at the camera position
-rr.log("World/camera_frustum/frame", rr.Arrows3D(
-    vectors=[[50, 0, 0], [0, 50, 0], [0, 0, 50]],
-    origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-    colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],
-    labels=['X', 'Y', 'Z']
-), timeless=True)
+# Send camera transforms for each timestamp
+for t, transform in zip(tracking_timestamps_ns, transforms):
+    rr.set_time_nanos("video_time", t)
+    rr.log("World/camera_frustum", transform)
