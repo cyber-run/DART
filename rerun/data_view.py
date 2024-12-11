@@ -4,6 +4,8 @@ import rerun as rr
 import re
 import pandas as pd
 from pathlib import Path
+import json
+from scipy.spatial.transform import Rotation
 
 # Get the recordings directory
 recordings_dir = Path("static/recordings")
@@ -166,3 +168,62 @@ rr.send_columns(
         rr.components.Translation3DBatch(positions)  # Update transform to follow position
     ]
 )
+
+# Load camera calibration data
+with open('config/app_config.json', 'r') as f:
+    config = json.load(f)
+
+tilt_origin = np.array(config['calibration']['tilt_origin'])
+rotation_matrix = np.array(config['calibration']['rotation_matrix'])
+
+# Convert calibration rotation matrix to camera view matrix
+# Rearrange axes to match camera view (Z = Forward, X = Right, Y = Down)
+camera_rotation = np.column_stack([
+    -rotation_matrix[:, 1],  # Right = -Y axis from calibration
+    rotation_matrix[:, 2],   # Down = Z axis from calibration
+    rotation_matrix[:, 0]    # Forward = X axis from calibration (pan direction)
+])
+
+# Convert to axis-angle
+r = Rotation.from_matrix(camera_rotation)
+axis_angle = r.as_rotvec()
+angle = np.linalg.norm(axis_angle)
+axis = axis_angle / angle if angle > 0 else np.array([0, 0, 1])
+
+# Camera parameters
+image_width = 1440
+image_height = 1000
+fov_y_degrees = 18.0
+aspect = image_width / image_height
+
+# Create the camera entity with RDF coordinates
+rr.log("World/camera_frustum", 
+    rr.Pinhole(
+        resolution=[image_width, image_height],
+        fov_y=np.radians(fov_y_degrees),
+        aspect_ratio=aspect,
+        camera_xyz=rr.ViewCoordinates.RDF,  # Right-Down-Forward to match standard camera coordinates
+        image_plane_distance=100.0
+    ),
+    timeless=True
+)
+
+# Set the camera transform
+rr.log("World/camera_frustum",
+    rr.Transform3D(
+        translation=tilt_origin.tolist(),
+        rotation=rr.RotationAxisAngle(
+            axis=axis.tolist(),
+            radians=float(angle)
+        )
+    ),
+    timeless=True
+)
+
+# Add a small coordinate frame at the camera position
+rr.log("World/camera_frustum/frame", rr.Arrows3D(
+    vectors=[[50, 0, 0], [0, 50, 0], [0, 0, 50]],
+    origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+    colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],
+    labels=['X', 'Y', 'Z']
+), timeless=True)
