@@ -13,7 +13,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.logger = logging.getLogger("TheiaLensControlWindow")
         self.title("Theia Lens Control")
-        self.geometry("600x400")
+        self.geometry("600x550")  # Increased height from 400 to 500
         self.resizable(False, False)
         self.configure(fg_color=BG_COLOR)
 
@@ -132,7 +132,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         self.iris_dec_button = ctk.CTkButton(
             button_frame,
             text="-",
-            command=lambda: self.adjust_iris(-10),
+            command=lambda: self.adjust_iris(-100),
             width=30
         )
         self.iris_dec_button.pack(side="left", padx=5)
@@ -151,7 +151,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         self.iris_inc_button = ctk.CTkButton(
             button_frame,
             text="+",
-            command=lambda: self.adjust_iris(10),
+            command=lambda: self.adjust_iris(100),
             width=30
         )
         self.iris_inc_button.pack(side="left", padx=5)
@@ -186,7 +186,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         try:
             if self.theia and self.theia.ser.is_open:
                 current = int(float(self.iris_entry.get() or "0"))
-                new_iris = max(0, min(200, current + delta))  # Clamp between 0-200
+                new_iris = max(0, min(1000, current + delta))  # Clamp between 0-1000
                 self.iris_entry.delete(0, "end")
                 self.iris_entry.insert(0, str(new_iris))
                 self.set_iris(str(new_iris))
@@ -198,7 +198,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
         try:
             if self.theia and self.theia.ser.is_open:
                 new_iris = int(float(value or "0"))  # Convert string to int, default to 0 if empty
-                if 0 <= new_iris <= 200:  # Add bounds checking
+                if 0 <= new_iris <= 1000:  # Add bounds checking
                     self.theia.move_axis("C", new_iris)
                     self.current_iris = new_iris
                     self.iris_label.configure(text=f"Iris: {new_iris} steps")
@@ -208,7 +208,7 @@ class TheiaLensControlWindow(ctk.CTkToplevel):
                 else:
                     self.logger.warning(f"Iris value {new_iris} out of range")
                     # Reset to valid value
-                    new_iris = max(0, min(200, new_iris))
+                    new_iris = max(0, min(1000, new_iris))
                     self.iris_entry.delete(0, "end")
                     self.iris_entry.insert(0, str(new_iris))
         except Exception as e:

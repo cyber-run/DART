@@ -93,11 +93,13 @@ class DynaTracker:
         self.logger.info(f"Initialized Theia with saved positions - Zoom: {zoom_position}, Focus: {focus_position}")
 
         # Define the data points
-        distance_data = np.array([0.68, 1.05, 1.61, 1.110, 0.699])
-        steps_data = np.array([0, 2000, 6000, 4000, 0])
+        # distance_data = np.array([0.68, 1.05, 1.61, 1.110, 0.699])
+        # steps_data = np.array([0, 2000, 6000, 4000, 0])
+        distance_data = np.array([0.78, 1.01, 1.37, 1.69, 1.78, 2.10])
+        steps_data = np.array([730, 5281, 5958, 7854, 8125, 10000])
 
         # Fit a polynomial curve (degree 2) to the data
-        self.coefficients = np.polyfit(distance_data, steps_data, 2)
+        self.coefficients = np.polyfit(distance_data, steps_data, 3)
         self.dist = 0
 
         self.counter = 0
@@ -150,11 +152,20 @@ class DynaTracker:
                 self.kalman.adapt_Q(measurement)
 
             # Latency compensation
-            latency_duration = 0.003  # Total latency in seconds (3 ms)
+            latency_duration = 0.008  # Increased from 0.003 to 0.008 seconds (8 ms) to better account for system delays
             self.kalman.predict_latency(latency_duration)
 
-            # Get estimated position
+            # Get estimated position and velocity
             estimated_position = self.kalman.get_position()
+            estimated_velocity = self.kalman.state_estimate[3:6].flatten()  # Get velocity estimate
+
+            # Add velocity-based prediction for fast movements
+            velocity_magnitude = np.linalg.norm(estimated_velocity)
+            if velocity_magnitude > 0.5:  # If moving faster than 0.5 m/s
+                prediction_time = 0.016  # Look ahead 16ms for fast movements
+                position_prediction = estimated_position + estimated_velocity * prediction_time
+                estimated_position = position_prediction
+
         else:
             # Use raw target position when Kalman is disabled
             if self.target.lost:

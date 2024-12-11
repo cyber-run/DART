@@ -128,7 +128,6 @@ class DART:
             self.camera_manager.stop_frame_thread()
 
     def toggle_record(self):
-        # If camera manager is not recording, start recording
         if self.state.ui.record_button.cget("text") == "Record":
             # Stop the stream frame thread if it's running
             if self.camera_manager.is_reading:
@@ -165,6 +164,14 @@ class DART:
                     start_time=self.state.recording.record_start_ms
                 )
                 
+                # Wait briefly for frame timestamps to be available
+                time.sleep(0.1)  # Wait 100ms for frames to accumulate
+                
+                if self.camera_manager.frame_timestamps:
+                    self.data_handler.set_frame_timestamps(self.camera_manager.frame_timestamps)
+                else:
+                    self.logger.warning("No frame timestamps available yet")
+                
                 # Check for old value stored in queue and clear it
                 if self.state.tracking['data_queue'].full():
                     _ = self.state.tracking['data_queue'].get() # Clear the queue
@@ -179,13 +186,30 @@ class DART:
 
             self.state.ui.pause_button.configure(state="normal")
         else:
-            # Stop recording
-            self.camera_manager.stop_recording()
-
-            # Stop the DataHandler if tracking is enabled
+            self.logger.info("Stopping recording sequence...")
+            
+            # 1. Stop collecting new data
             if self.state.tracking['process'] is not None:
-                self.data_handler.stop()  # Stop the DataHandler
+                self.data_handler.stop_collecting()
+            
+            # 2. Stop camera recording
+            self.camera_manager.stop_recording()
+            
+            # 3. Wait for all frames to be written
+            self.logger.info("Waiting for frame writing to complete...")
+            while self.camera_manager.writing:
+                time.sleep(0.1)
+            
+            # 4. Now that frames are written, handle data
+            if self.state.tracking['process'] is not None:
+                # Get complete frame timestamps
+                frame_timestamps = self.camera_manager.get_frame_timestamps()
+                self.data_handler.set_frame_timestamps(frame_timestamps)
+                
+                # 5. Stop the DataHandler and process data
+                self.data_handler.stop()
 
+            # Update UI
             if self.camera_manager.is_paused:
                 self.state.ui.pause_button.configure(
                     text="Pause", 

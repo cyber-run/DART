@@ -22,15 +22,15 @@ class AdaptiveKalmanFilter:
         self.H[:3, :3] = np.eye(3)
 
         # Process and measurement noise
-        self.Q0 = np.eye(self.dim_x) * 1e-6  # Initial process noise
+        self.Q0 = np.eye(self.dim_x) * 1e-4  # Increased from 1e-6 for faster response
         self.Q = self.Q0.copy()  # Current process noise
-        self.R = np.eye(self.dim_z) * 1e-4  # Measurement noise
+        self.R = np.eye(self.dim_z) * 1e-5   # Decreased from 1e-4 to trust measurements more
 
         # Adaptive parameters
         self.alpha = 1.0  # Adaptive factor
-        self.alpha_min = 0.1
-        self.alpha_max = 10.0
-        self.expected_innovation_variance = 1e-3
+        self.alpha_min = 0.2  # Increased minimum to maintain some responsiveness
+        self.alpha_max = 20.0  # Increased from 10.0 to allow more aggressive adaptation
+        self.expected_innovation_variance = 1e-4  # Decreased from 1e-3 for faster adaptation
 
     def create_F(self, delta_t: float) -> np.ndarray:
         """
