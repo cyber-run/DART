@@ -219,7 +219,7 @@ class CameraManager:
             "-input_framerate": 30,
             "-r": "30",
             "-preset": "ultrafast",
-            "-crf": 26,
+            "-crf": 22,
             "-ffmpeg_download_path": "_local/ffmpeg"
         }
 

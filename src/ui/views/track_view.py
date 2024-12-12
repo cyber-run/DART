@@ -56,7 +56,7 @@ class TrackView(BaseView):
         control_frame.pack(side="top", padx=10, pady=10)
 
         # Pan control
-        pan_frame = ctk.CTkFrame(control_frame, width=80, height=500, fg_color=TRANSPARENT)
+        pan_frame = ctk.CTkFrame(control_frame, width=80, height=400, fg_color=TRANSPARENT)
         pan_frame.grid(row=0, column=0, padx=0, pady=0)
         pan_frame.pack_propagate(False)
 
@@ -75,13 +75,13 @@ class TrackView(BaseView):
             to=45,
             command=self.dart.set_pan,
             orientation="vertical",
-            height=500
+            height=400
         )
         self.dart.state.ui.pan_slider.set(self.dart.state.motor['pan_value'])
         self.dart.state.ui.pan_slider.pack(padx=5, pady=5)
 
         # Tilt control
-        tilt_frame = ctk.CTkFrame(control_frame, width=80, height=500, fg_color=TRANSPARENT)
+        tilt_frame = ctk.CTkFrame(control_frame, width=80, height=400, fg_color=TRANSPARENT)
         tilt_frame.grid(row=0, column=1, padx=0, pady=0)
         tilt_frame.pack_propagate(False)
 
@@ -100,7 +100,7 @@ class TrackView(BaseView):
             to=45,
             command=self.dart.set_tilt,
             orientation="vertical",
-            height=500
+            height=400
         )
         self.dart.state.ui.tilt_slider.set(self.dart.state.motor['tilt_value'])
         self.dart.state.ui.tilt_slider.pack(padx=5, pady=5)

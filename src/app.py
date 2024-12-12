@@ -64,8 +64,8 @@ class DART:
         self.window.title("DART")
 
         # Set the minimum window size to the initial size
-        self.window.geometry("1440x1080")
-        self.window.minsize(1440, 1080)
+        self.window.geometry("1200x820")
+        self.window.minsize(1200, 820)
 
     def init_hardware(self):
         """Initialize and connect hardware from saved configuration"""
