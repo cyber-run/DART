@@ -4,7 +4,7 @@ from threading import Thread
 from queue import Queue
 from pathlib import Path
 from time import perf_counter_ns
-from utils.perf_timings import perf_counter_ns, PerfSleeper
+from utils.perf_timings import perf_counter_ns
 
 # Settings the warnings to be ignored 
 warnings.filterwarnings('ignore') 
@@ -35,10 +35,6 @@ class CameraManager:
 
         # Init cam props
         self.initialise_cam_props()
-
-        # Add high-precision timer
-        if sys.platform == 'win32':
-            self.perf_timer = PerfSleeper()
 
         self.writing = False
 

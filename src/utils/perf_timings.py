@@ -1,6 +1,5 @@
 import sys
-import ctypes
-from ctypes.wintypes import LARGE_INTEGER
+from time import sleep
 
 if sys.platform != 'win32':
     from time import perf_counter
@@ -12,7 +11,16 @@ if sys.platform != 'win32':
             Performance counter for benchmarking as nanoseconds.
             """
             return int(perf_counter() * 10**9)
+            
+    # Add a basic sleep implementation for non-Windows platforms
+    class PerfSleeper:
+        def sleep_ms(self, ms_time):
+            sleep(ms_time / 1000.0)
+            
 else:
+    import ctypes
+    from ctypes.wintypes import LARGE_INTEGER
+    
     kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
     
     # Constants
@@ -60,4 +68,4 @@ else:
     _qpc_frequency = LARGE_INTEGER()
     if not kernel32.QueryPerformanceFrequency(ctypes.byref(_qpc_frequency)):
         raise ctypes.WinError(ctypes.get_last_error())
-    _qpc_frequency = _qpc_frequency.value 
+    _qpc_frequency = _qpc_frequency.value

@@ -1,12 +1,12 @@
 import threading, time, math, logging
-from utils.misc_funcs import set_realtime_priority
+# from utils.misc_funcs import set_realtime_priority
 from typing import Dict, Tuple
 from dynamixel_sdk import *
 import numpy as np
 
 
 class DynaController:
-    def __init__(self, com_port: str = 'COM5', baud_rate: int = 4000000) -> None:
+    def __init__(self, com_port: str = 'COM5', baud_rate: int = 3000000) -> None:
         self.logger = logging.getLogger("Dyna")
         # EEPROM addresses for X-series:
         self.X_TORQUE_ENABLE = 64       # Torque enable
@@ -82,16 +82,14 @@ class DynaController:
         try:
             if self.port_handler.openPort():
                 self.logger.info("Succeeded to open the port")
+                # More balanced timeout settings
+                self.port_handler.setBaudRate(self.baud)
+                self.port_handler.setPacketTimeout(1)      # 2ms packet timeout
+                self.port_handler.setPacketTimeoutMillis(1)  # 2ms timeout for partial packets
+                return True
             else:
                 self.logger.debug("Failed to open the port")
                 return False
-
-            if self.port_handler.setBaudRate(self.baud):
-                self.logger.debug("Succeeded to change the baudrate")
-            else:
-                self.logger.debug("Failed to change the baudrate")
-                return False
-            return True
         except Exception as e:
             self.logger.debug(f"Error opening port: {e}")
             return False
@@ -490,7 +488,7 @@ class DynaController:
         self.port_handler.closePort()
 
 def get_pwm_bode():
-    set_realtime_priority()
+    # set_realtime_priority()
 
     dyna = DynaController()
     dyna.open_port()
@@ -558,9 +556,9 @@ def get_pwm_bode():
             dyna.set_sync_current(0, 0)
 
 def get_theta_bode():
-    set_realtime_priority()
+    # set_realtime_priority()
 
-    dyna = DynaController()
+    dyna = DynaController(com_port="/dev/cu.usbserial-FT89FAA7")
     dyna.open_port()
 
     dyna.set_op_mode(dyna.pan_id, 3)
@@ -655,6 +653,115 @@ def main2():
     dyna.set_torque(dyna.tilt_id, False)
 
 if __name__ == "__main__":
-    # main()
-    get_theta_bode()
-    # get_pwm_bode()
+    import statistics
+    import numpy as np
+    from time import perf_counter_ns
+    import matplotlib.pyplot as plt
+
+    # Test configuration
+    READ_INTERVAL_MS = 2.0  # Delay between reads in milliseconds
+    N_SAMPLES = 1000
+    LATENCY_TIMER = 1  # FTDI latency timer setting
+
+    # # Configure FTDI latency first
+    # try:
+    #     from pyftdi.ftdi import Ftdi
+    #     serial_number = "FT89FAA7"
+    #     ftdi_url = f'ftdi://ftdi:232h:{serial_number}/1'
+        
+    #     ftdi = Ftdi()
+    #     ftdi.open_from_url(ftdi_url)
+    #     ftdi.set_latency_timer(LATENCY_TIMER)
+    #     ftdi.close()
+    #     print(f"FTDI latency timer set to {LATENCY_TIMER}ms for device {serial_number}")
+    #     time.sleep(0.1)  # Wait for settings to take effect
+        
+    # except Exception as e:
+    #     print(f"Failed to configure FTDI: {e}")
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    
+    # Create controller instance
+    dyna = DynaController(com_port="/dev/cu.usbserial-FT89FAA7")
+    latencies = []
+    failed_reads = 0
+
+    try:
+        if not dyna.open_port():
+            raise Exception("Failed to open Dynamixel port")
+            
+        dyna.set_op_mode(dyna.pan_id, 3)
+        dyna.set_op_mode(dyna.tilt_id, 3)
+        dyna.set_torque(dyna.pan_id, True)
+        dyna.set_torque(dyna.tilt_id, True)
+        
+        print(f"\nMeasuring Dynamixel sync read latency (interval: {READ_INTERVAL_MS}ms)...")
+        
+        for i in range(N_SAMPLES):
+            try:
+                start_time = perf_counter_ns()
+                pos = dyna.get_sync_pos()
+                end_time = perf_counter_ns()
+                
+                if pos[0] is not None and pos[1] is not None:
+                    latency_ms = (end_time - start_time) / 1e6
+                    latencies.append(latency_ms)
+                    
+                    if i % 10 == 0:
+                        print(f"Sample {i}/{N_SAMPLES}: {latency_ms:.2f}ms")
+                else:
+                    failed_reads += 1
+                    print(f"Failed read at sample {i}")
+                    
+            except Exception as e:
+                failed_reads += 1
+                print(f"Error at sample {i}: {e}")
+                
+            # Precise delay between reads
+            time.sleep(READ_INTERVAL_MS / 1000.0)
+                
+        if latencies:
+            # Calculate statistics
+            avg_latency = statistics.mean(latencies)
+            std_dev = statistics.stdev(latencies)
+            min_latency = min(latencies)
+            max_latency = max(latencies)
+            p95_latency = np.percentile(latencies, 95)
+            
+            print("\nDynamixel Sync Read Latency Statistics:")
+            print(f"Test Configuration:")
+            print(f"- Read interval: {READ_INTERVAL_MS}ms")
+            print(f"- FTDI latency timer: {LATENCY_TIMER}ms")
+            print(f"- Samples: {N_SAMPLES}")
+            print(f"\nResults:")
+            print(f"Successful reads: {len(latencies)}/{N_SAMPLES}")
+            print(f"Failed reads: {failed_reads}")
+            print(f"Average Latency: {avg_latency:.2f}ms")
+            print(f"Standard Deviation: {std_dev:.2f}ms")
+            print(f"Min Latency: {min_latency:.2f}ms")
+            print(f"Max Latency: {max_latency:.2f}ms")
+            print(f"95th Percentile: {p95_latency:.2f}ms")
+            
+            # Plot histogram
+            plt.figure(figsize=(10, 6))
+            plt.hist(latencies, bins=30, edgecolor='black')
+            plt.title(f'Dynamixel Sync Read Latency Distribution\n(interval: {READ_INTERVAL_MS}ms)')
+            plt.xlabel('Latency (ms)')
+            plt.ylabel('Frequency')
+            plt.axvline(avg_latency, color='r', linestyle='dashed', linewidth=2, label=f'Mean ({avg_latency:.2f}ms)')
+            plt.axvline(p95_latency, color='g', linestyle='dashed', linewidth=2, label=f'95th Percentile ({p95_latency:.2f}ms)')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.show()
+
+    except Exception as e:
+        print(f"Error: {e}")
+        
+    finally:
+        try:
+            dyna.set_torque(dyna.pan_id, False)
+            dyna.set_torque(dyna.tilt_id, False)
+            dyna.close_port()
+        except:
+            pass

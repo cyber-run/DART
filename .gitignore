@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv310/
+vendor/
 
 # Virtual environments
 .venv/

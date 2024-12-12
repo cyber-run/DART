@@ -320,27 +320,68 @@ class TheiaController:
             return None, None
     
 if __name__ == "__main__":
+    import statistics
+    import numpy as np
+    from time import perf_counter_ns
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    
     # Create an instance of TheiaController
-    controller = TheiaController(port="COM17")
+    controller = TheiaController(port="/dev/cu.usbmodem48EF337A394D1")
+    latencies = []
+    n_samples = 100  # Number of measurements to take
 
     try:
         # Connect to the controller
         controller.connect()
-
-        # Initialize the controller
         controller.initialise()
-
-        # Home the zoom axis
-        controller.home_zoom()
-
-        # Home the focus axis
-        controller.home_focus()
-
-        # Move zoom axis forward by 24000
-        # controller.move_axis("A", 24000)
-        # controller._wait_till_status_change(1, controller.ZOOM_MOVE)
-
-        controller.read_status()
+        
+        # Measure command latency
+        print("\nMeasuring serial command latency...")
+        for i in range(n_samples):
+            start_time = perf_counter_ns()
+            controller._ser_send("!1")  # Status request command
+            end_time = perf_counter_ns()
+            
+            latency_ms = (end_time - start_time) / 1e6  # Convert ns to ms
+            latencies.append(latency_ms)
+            
+            if i % 10 == 0:  # Progress update every 10 samples
+                print(f"Sample {i}/{n_samples}: {latency_ms:.2f}ms")
+        
+        # Calculate statistics
+        avg_latency = statistics.mean(latencies)
+        std_dev = statistics.stdev(latencies)
+        min_latency = min(latencies)
+        max_latency = max(latencies)
+        p95_latency = np.percentile(latencies, 95)
+        
+        # Print results
+        print("\nSerial Latency Statistics:")
+        print(f"Average Latency: {avg_latency:.2f}ms")
+        print(f"Standard Deviation: {std_dev:.2f}ms")
+        print(f"Min Latency: {min_latency:.2f}ms")
+        print(f"Max Latency: {max_latency:.2f}ms")
+        print(f"95th Percentile: {p95_latency:.2f}ms")
+        
+        # Optional: Plot histogram
+        try:
+            import matplotlib.pyplot as plt
+            
+            plt.figure(figsize=(10, 6))
+            plt.hist(latencies, bins=30, edgecolor='black')
+            plt.title('Serial Command Latency Distribution')
+            plt.xlabel('Latency (ms)')
+            plt.ylabel('Frequency')
+            plt.axvline(avg_latency, color='r', linestyle='dashed', linewidth=2, label=f'Mean ({avg_latency:.2f}ms)')
+            plt.axvline(p95_latency, color='g', linestyle='dashed', linewidth=2, label=f'95th Percentile ({p95_latency:.2f}ms)')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.show()
+            
+        except ImportError:
+            print("\nMatplotlib not available for plotting.")
 
     except Exception as e:
         controller.logger.exception("An error occurred:")

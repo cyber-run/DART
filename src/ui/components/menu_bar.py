@@ -2,6 +2,7 @@ from CTkMenuBar import *
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
 import os
+import tkinter as tk
 from typing import Callable
 
 class MenuBar:
@@ -24,20 +25,40 @@ class MenuBar:
     
     def setup_menu(self):
         """Set up the menu bar and its items"""
-        # Create the title menu if windows else create menu bar
-        self.title_menu = CTkTitleMenu(self.parent) if os.name == "nt" else CTkMenuBar(self.parent)
+        if os.name == "nt":  # Windows
+            # Create the CTk menu bar
+            self.title_menu = CTkTitleMenu(self.parent)
+            
+            # File menu
+            file_menu = self.title_menu.add_cascade(text="File")
+            file_dropdown = CustomDropdownMenu(widget=file_menu)
+            file_dropdown.add_option(option="Track", command=self.track_callback)
+            file_dropdown.add_separator()
+            file_dropdown.add_option(option="Exit", command=self.exit_callback)
 
-        # File menu
-        file_menu = self.title_menu.add_cascade(text="File")
-        file_dropdown = CustomDropdownMenu(widget=file_menu)
-        file_dropdown.add_option(option="Track", command=self.track_callback)
-        file_dropdown.add_separator()
-        file_dropdown.add_option(option="Exit", command=self.exit_callback)
-
-        # Tools menu
-        tools_menu = self.title_menu.add_cascade(text="Tools")
-        tools_dropdown = CustomDropdownMenu(widget=tools_menu)
-        tools_dropdown.add_option(option="Detect Device", 
-                                command=self.detect_devices_callback)
-        tools_dropdown.add_option(option="Lens Control", 
-                                command=self.lens_control_callback) 
+            # Tools menu
+            tools_menu = self.title_menu.add_cascade(text="Tools")
+            tools_dropdown = CustomDropdownMenu(widget=tools_menu)
+            tools_dropdown.add_option(option="Detect Device", 
+                                    command=self.detect_devices_callback)
+            tools_dropdown.add_option(option="Lens Control", 
+                                    command=self.lens_control_callback)
+        else:  # macOS and Linux
+            # Create native tkinter menubar
+            self.menubar = tk.Menu(self.parent)
+            self.parent.configure(menu=self.menubar)
+            
+            # File menu
+            file_menu = tk.Menu(self.menubar, tearoff=0)
+            self.menubar.add_cascade(label="File", menu=file_menu)
+            file_menu.add_command(label="Track", command=self.track_callback)
+            file_menu.add_separator()
+            file_menu.add_command(label="Exit", command=self.exit_callback)
+            
+            # Tools menu
+            tools_menu = tk.Menu(self.menubar, tearoff=0)
+            self.menubar.add_cascade(label="Tools", menu=tools_menu)
+            tools_menu.add_command(label="Detect Device", 
+                                 command=self.detect_devices_callback)
+            tools_menu.add_command(label="Lens Control", 
+                                 command=self.lens_control_callback)
