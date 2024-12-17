@@ -3,9 +3,10 @@ from threading import Thread
 import tkinter as tk
 from tkinter import ttk
 import threading
+from .mocap_base import MocapBase
 
 
-class QTMStream(Thread):
+class QTMStream(MocapBase, Thread):
     def __init__(self, qtm_ip="192.168.100.1"):
         """
         Constructs QtmWrapper object.
@@ -17,6 +18,7 @@ class QTMStream(Thread):
         """
 
         Thread.__init__(self)
+        MocapBase.__init__(self)
 
         self.logger = logging.getLogger("QTM")
 
@@ -25,15 +27,11 @@ class QTMStream(Thread):
         self._connection = None
         self._stay_open = True
 
-        # Kinematic data vars
-        self.markers = None
-        self.position = [0,0,0]
-        self.position2 = [0,0,0]
-        self.lost = False
-        self.calibration_target = False
-        self.num_markers = 0
-
         self.start()
+
+    def start(self):
+        """Start the QTM stream"""
+        Thread.start(self)  # Call Thread's start method
 
     def run(self) -> None:
         """
@@ -114,6 +112,30 @@ class QTMStream(Thread):
         """
         self._stay_open = False
         self.join()
+
+    @property
+    def position(self):
+        return self._position
+
+    @position.setter
+    def position(self, value):
+        self._position = value
+
+    @property
+    def position2(self):
+        return self._position2
+
+    @position2.setter
+    def position2(self, value):
+        self._position2 = value
+
+    @property
+    def num_markers(self):
+        return self._num_markers
+
+    @num_markers.setter
+    def num_markers(self, value):
+        self._num_markers = value
 
 
 class QTMControl(Thread):
@@ -221,10 +243,6 @@ def stop_recording():
     global control
     bridge.run_coroutine(control.stop_recording())
 
-def set_qtm_event(event_str: str='Paused'):
-    global control, bridge
-    bridge.run_coroutine(control.set_qtm_event(event_str))
-
 def close_app():
     # Schedule the control's close coroutine in the asyncio event loop
     control.close()
@@ -240,10 +258,9 @@ if __name__ == '__main__':
     root = tk.Tk()
     root.title("QTM Control")
 
-    #  asyncio.get_event_loop().set_debug(True)
     loop = asyncio.get_event_loop()
     
-    control = QTMControl()  # Assuming this is modified to not start automatically
+    control = QTMControl()
     bridge = TkinterAsyncioBridge(root)
     bridge.start()
 
@@ -252,9 +269,6 @@ if __name__ == '__main__':
 
     stop_button = ttk.Button(root, text="Stop Recording", command=stop_recording)
     stop_button.pack(pady=10)
-
-    pause_button = ttk.Button(root, text="Pause Recording", command=lambda: set_qtm_event('Paused'))
-    pause_button.pack(pady=10)
 
     root.protocol("WM_DELETE_WINDOW", close_app)
 

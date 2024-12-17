@@ -50,9 +50,8 @@ class UIState:
     
     # Buttons
     record_button: Optional[Any] = None
-    pause_button: Optional[Any] = None
-    track_button: Optional[Any] = None
     toggle_video_button: Optional[Any] = None
+    track_button: Optional[Any] = None
     
     # Additional UI elements
     serial_refresh: Optional[Any] = None

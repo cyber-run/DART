@@ -38,6 +38,8 @@ class DynaController:
         self.read_positions_flag = True
         self.lock = threading.Lock()
 
+        # self.set_ftdi_latency(1)
+
         self.port_handler = PortHandler(self.com)
         self.packet_handler = PacketHandler(self.PROTOCOL_VERSION)
 
@@ -72,6 +74,23 @@ class DynaController:
         # Init motor rotations to normal forward gaze
         # self.set_sync_pos(225, 315)
 
+    def set_ftdi_latency(self, latency: int = 1) -> None:
+        # Configure FTDI latency first
+        try:
+            from pyftdi.ftdi import Ftdi
+            serial_number = "FT89FAA7"
+            ftdi_url = f'ftdi://ftdi:232h:{serial_number}/1'
+            
+            ftdi = Ftdi()
+            ftdi.open_from_url(ftdi_url)
+            ftdi.set_latency_timer(latency)
+            ftdi.close()
+            print(f"FTDI latency timer set to {latency}ms for device {serial_number}")
+            time.sleep(0.1)  # Wait for settings to take effect
+            
+        except Exception as e:
+            print(f"Failed to configure FTDI: {e}")
+
     def open_port(self) -> bool:
         '''
         Open serial port for communication with servo.
@@ -84,8 +103,8 @@ class DynaController:
                 self.logger.info("Succeeded to open the port")
                 # More balanced timeout settings
                 self.port_handler.setBaudRate(self.baud)
-                self.port_handler.setPacketTimeout(1)      # 2ms packet timeout
-                self.port_handler.setPacketTimeoutMillis(1)  # 2ms timeout for partial packets
+                # self.port_handler.setPacketTimeout(1)      # 2ms packet timeout
+                # self.port_handler.setPacketTimeoutMillis(1)  # 2ms timeout for partial packets
                 return True
             else:
                 self.logger.debug("Failed to open the port")
@@ -522,6 +541,8 @@ def get_pwm_bode():
 
             dyna.set_op_mode(dyna.pan_id, 3)
             dyna.set_op_mode(dyna.tilt_id, 3)
+            dyna.set_torque(dyna.pan_id, True)
+            dyna.set_torque(dyna.tilt_id, True)
             dyna.set_sync_pos(225, 315)
             time.sleep(0.3)
 
@@ -663,22 +684,6 @@ if __name__ == "__main__":
     N_SAMPLES = 1000
     LATENCY_TIMER = 1  # FTDI latency timer setting
 
-    # # Configure FTDI latency first
-    # try:
-    #     from pyftdi.ftdi import Ftdi
-    #     serial_number = "FT89FAA7"
-    #     ftdi_url = f'ftdi://ftdi:232h:{serial_number}/1'
-        
-    #     ftdi = Ftdi()
-    #     ftdi.open_from_url(ftdi_url)
-    #     ftdi.set_latency_timer(LATENCY_TIMER)
-    #     ftdi.close()
-    #     print(f"FTDI latency timer set to {LATENCY_TIMER}ms for device {serial_number}")
-    #     time.sleep(0.1)  # Wait for settings to take effect
-        
-    # except Exception as e:
-    #     print(f"Failed to configure FTDI: {e}")
-
     # Configure logging
     logging.basicConfig(level=logging.INFO)
     
@@ -701,7 +706,9 @@ if __name__ == "__main__":
         for i in range(N_SAMPLES):
             try:
                 start_time = perf_counter_ns()
+                dyna.set_sync_pos(45, 45)
                 pos = dyna.get_sync_pos()
+                print(pos)
                 end_time = perf_counter_ns()
                 
                 if pos[0] is not None and pos[1] is not None:

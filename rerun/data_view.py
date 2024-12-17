@@ -6,21 +6,81 @@ import pandas as pd
 from pathlib import Path
 import json
 from scipy.spatial.transform import Rotation
+from pick import pick
+from datetime import datetime
 
-# Get the recordings directory
-recordings_dir = Path("static/recordings")
+def parse_timestamp(filename):
+    # Extract timestamp like 1612T143225 from filename
+    match = re.search(r'(\d{4}T\d{6})', filename)
+    return match.group(1) if match else None
 
-# Find most recent video and parquet files
-video_files = list(recordings_dir.glob("*.mp4"))
-parquet_files = list(recordings_dir.glob("*.parquet"))
+def get_file_pairs():
+    recordings_dir = Path("static/recordings")
+    video_files = list(recordings_dir.glob("*.mp4"))
+    parquet_files = list(recordings_dir.glob("*.parquet"))
+    
+    # Create dictionary of timestamp -> (video, parquet) pairs
+    pairs = {}
+    
+    # Process video files
+    for video in video_files:
+        timestamp = parse_timestamp(video.name)
+        if timestamp:
+            if timestamp not in pairs:
+                pairs[timestamp] = {'video': None, 'parquet': None}
+            pairs[timestamp]['video'] = video
+    
+    # Process parquet files
+    for parquet in parquet_files:
+        timestamp = parse_timestamp(parquet.name)
+        if timestamp:
+            if timestamp not in pairs:
+                pairs[timestamp] = {'video': None, 'parquet': None}
+            pairs[timestamp]['parquet'] = parquet
+    
+    # Filter to only complete pairs and format for display
+    complete_pairs = {
+        timestamp: files 
+        for timestamp, files in pairs.items() 
+        if files['video'] and files['parquet']
+    }
+    
+    # Convert timestamps to readable format and create selection options
+    options = []
+    for timestamp in complete_pairs.keys():
+        try:
+            dt = datetime.strptime(timestamp, '%d%mT%H%M%S')
+            readable_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+            options.append((timestamp, readable_time))
+        except ValueError:
+            options.append((timestamp, timestamp))
+    
+    return options, complete_pairs
 
-if not video_files or not parquet_files:
-    raise FileNotFoundError("No video or parquet files found in recordings directory")
+def select_files():
+    options, pairs = get_file_pairs()
+    if not options:
+        raise FileNotFoundError("No matching video/parquet pairs found in recordings directory")
+    
+    # Sort options by timestamp (newest first)
+    options.sort(reverse=True)
+    
+    # Create display options
+    display_options = [f"{readable_time}" for _, readable_time in options]
+    
+    title = 'Please choose a recording (use arrow keys, press Enter to select):'
+    selected_option, index = pick(display_options, title)
+    
+    # Get the timestamp for the selected option
+    selected_timestamp = options[index][0]
+    selected_pair = pairs[selected_timestamp]
+    
+    return selected_pair['video'], selected_pair['parquet']
 
-newest_video = max(video_files, key=lambda x: x.stat().st_mtime)
-newest_parquet = max(parquet_files, key=lambda x: x.stat().st_mtime)
+# Get the selected files
+newest_video, newest_parquet = select_files()
 
-print(f"Loading newest files:")
+print(f"Loading selected files:")
 print(f"Video: {newest_video.name}")
 print(f"Data: {newest_parquet.name}")
 
@@ -50,6 +110,9 @@ rr.log("angles/encoder/tilt", rr.SeriesLine(color=[255, 255, 0], name="Encoder T
 # Load and process tracking data
 df = pd.read_parquet(newest_parquet)
 df = df[df['sync_error_ms'] <= 3].sort_values('relative_time_ms')
+
+# Filter out zero encoder values
+df = df[(df['encoder_pan'] != 0) & (df['encoder_tilt'] != 0)]
 
 # Process trajectory data
 trajectory_points = []
@@ -81,8 +144,7 @@ rr.log("World", rr.Transform3D(translation=center.tolist()), timeless=True)
 rr.log("World", rr.Arrows3D(
     vectors=[[200, 0, 0], [0, 200, 0], [0, 0, 200]],
     origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-    colors=[[255, 100, 100], [100, 255, 100], [100, 100, 255]],
-    labels=['X', 'Y', 'Z']
+    colors=[[255, 100, 100], [100, 255, 100], [100, 100, 255]]
 ), timeless=True)
 
 # Log video asset which is referred to by frame references

@@ -11,6 +11,9 @@ import threading
 import math
 from core.config_manager import ConfigManager
 from tracking.kalman_filter import AdaptiveKalmanFilter
+from tracking.visual_tracker import VisualTracker
+import os
+import sys
 
 
 class DynaTracker:
@@ -21,7 +24,7 @@ class DynaTracker:
       the computer via USB and that the QTM mocap system is running and streaming
       data.
     '''
-    def __init__(self, data_queue):
+    def __init__(self, data_queue, mocap=None):
         self.logger = logging.getLogger("Track")
         # Configure logging for this process with a console handler
         logging.basicConfig(
@@ -56,8 +59,8 @@ class DynaTracker:
         # Create a queue to store data
         self.data_queue = data_queue
 
-        # Connect to QTM; init tracker and target
-        self.target = QTMStream()
+        # Use provided mocap instance or create new one
+        self.target = mocap
         self.target_pos = None
         time.sleep(0.1)
 
@@ -71,6 +74,10 @@ class DynaTracker:
         # Default init operating mode into position
         self.dyna.set_op_mode(self.dyna.pan_id, 3)
         self.dyna.set_op_mode(self.dyna.tilt_id, 3)
+
+        # Enable torque for both motors
+        self.dyna.set_torque(self.dyna.pan_id, True)
+        self.dyna.set_torque(self.dyna.tilt_id, True)
 
         self.start_time = time.perf_counter()
 
@@ -98,15 +105,19 @@ class DynaTracker:
         distance_data = np.array([0.78, 1.01, 1.37, 1.69, 1.78, 2.10])
         steps_data = np.array([730, 5281, 5958, 7854, 8125, 10000])
 
+        # 21264
+        distance_data = np.array([2.1476, 3.9804, 6.00604])
+        steps_data = np.array([9500, 11375, 13000])
+
         # Fit a polynomial curve (degree 2) to the data
-        self.coefficients = np.polyfit(distance_data, steps_data, 3)
+        self.coefficients = np.polyfit(distance_data, steps_data, 2)
         self.dist = 0
 
         self.counter = 0
 
         # Initialize Kalman Filter only if enabled in config
         self.use_kalman = self.config.config["tracking"].get("use_kalman", True)
-        self.kalman = AdaptiveKalmanFilter() if self.use_kalman else None
+        self.kalman = AdaptiveKalmanFilter(mode='position') if self.use_kalman else None
         self.last_time = time.perf_counter()
 
     def tilt_global_to_local(self, point_global: np.ndarray) -> np.ndarray:
@@ -192,11 +203,13 @@ class DynaTracker:
         _, tilt_angle = self.calc_rot_comp(tilt_local_target_pos)
 
         # Convert geometric angles to dynamixel angles
-        pan_angle = round(num_to_range(pan_angle, 45, -45, 22.5, 67.5), 2)
-        tilt_angle = round(num_to_range(tilt_angle, 45, -45, 22.5, 67.5), 2)
+        pan_angle = round(num_to_range(pan_angle, 45, -45, 22.5, 67.5), 2) 
+        tilt_angle = round(num_to_range(tilt_angle, 45, -45, 22.5, 67.5), 2) - 0.1
 
         # Set the dynamixel to the calculated angles
         self.dyna.set_sync_pos(pan_angle, tilt_angle)
+
+        time.sleep(1/1000)
         
         # Get the current angles of the dynamixels
         encoder_pan_angle, encoder_tilt_angle = self.dyna.get_sync_pos()
@@ -222,46 +235,101 @@ class DynaTracker:
         # Print control frequency
         end_time = time.perf_counter()
         self.logger.info(f"Control frequency: {self.counter / (end_time - self.start_time)} Hz")
-    
+
         # Retrieve current lens positions
         try:
             zoom_position, focus_position = self.theia.get_current_positions()
             if zoom_position is not None and focus_position is not None:
                 self.logger.info(f"Current Theia positions - Zoom: {zoom_position}, Focus: {focus_position}")
-                # Save positions to config
                 self.config.update_theia_position(zoom=zoom_position, focus=focus_position)
-                self.config.save_config()  # Ensure the config is saved to file
+                self.config.save_config()
                 self.logger.info("Lens positions saved to configuration.")
             else:
                 self.logger.warning("Could not retrieve current lens positions.")
         except Exception as e:
             self.logger.error(f"Error retrieving lens positions during shutdown: {e}")
-    
-        # Shutdown QTM
-        asyncio.run_coroutine_threadsafe(self.target._close(), asyncio.get_event_loop())
-    
-        # Close QTM connections
-        self.target.close()
-    
+
+        # Close mocap connection
+        if self.target:
+            try:
+                # Handle QTM specific cleanup
+                if hasattr(self.target, '_close'):
+                    asyncio.run_coroutine_threadsafe(self.target._close(), asyncio.get_event_loop())
+                # General cleanup for all mocap systems
+                self.target.close()
+            except Exception as e:
+                self.logger.error(f"Error closing mocap connection: {e}")
+
         # Close serial port
         self.dyna.close_port()
-    
+
         # Close Theia connection
         self.theia.disconnect()
-    
+
         return
 
 def dart_track(data_queue, terminate_event):
-    set_realtime_priority()
+    tracker = None
+    try:
+        # Set maximum real-time priority
+        set_realtime_priority()
+        if hasattr(os, 'sched_setscheduler'):
+            os.sched_setscheduler(0, os.SCHED_RR, os.sched_param(99))
+        elif sys.platform == 'darwin':
+            import resource
+            try:
+                resource.setrlimit(resource.RLIMIT_CPU, (-1, -1))
+                resource.setrlimit(resource.RLIMIT_CORE, (-1, -1))
+                resource.setrlimit(resource.RLIMIT_AS, (-1, -1))
+            except ValueError as e:
+                logging.warning(f"Could not set resource limits: {e}")
+    except Exception as e:
+        logging.warning(f"Could not set real-time priority: {e}")
     
-    dyna_tracker = DynaTracker(data_queue)
-
-    dyna_tracker.logger.info("Starting tracking.")
+    # Load config
+    config = ConfigManager()
     
-    while not terminate_event.is_set():
-        dyna_tracker.track()
-    
-    dyna_tracker.shutdown()
+    # Initialize appropriate tracker based on mode
+    try:
+        if config.config["tracking"]["mode"] == "visual":
+            tracker = VisualTracker(data_queue, config.config)
+        else:
+            # Initialize mocap based on config
+            mocap_config = config.config["devices"]["mocap"]
+            system = mocap_config.get("system", "qualisys")
+            
+            if system == "qualisys":
+                from hardware.mocap.qtm_mocap import QTMStream
+                mocap = QTMStream(qtm_ip=mocap_config["ip"])
+            elif system == "vicon":
+                from hardware.mocap.vicon_stream import ViconStream
+                mocap = ViconStream(
+                    vicon_host=mocap_config["ip"],
+                    udp_port=mocap_config["port"]
+                )
+            else:
+                raise ValueError(f"Unknown mocap system: {system}")
+                
+            mocap.start()
+            mocap.calibration_target = True
+            
+            tracker = DynaTracker(data_queue, mocap)
+            
+        while not terminate_event.is_set():
+            tracker.track()
+            
+    except Exception as e:
+        logging.error(f"Error in tracking: {e}")
+        
+    finally:
+        if tracker:
+            tracker.shutdown()
+        # Clear the queue
+        while not data_queue.empty():
+            try:
+                data_queue.get_nowait()
+            except:
+                pass
 
 if __name__ == '__main__':
     data_queue = queue.Queue(maxsize=1)  # Adjust maxsize as needed

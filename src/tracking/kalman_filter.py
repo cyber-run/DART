@@ -6,20 +6,32 @@ class AdaptiveKalmanFilter:
     Adaptive Kalman Filter for 3D position tracking with velocity and acceleration estimation.
     Implements an adaptive process noise adjustment based on innovation monitoring.
     """
-    def __init__(self):
-        # State vector dimension (position, velocity, acceleration in 3D)
-        self.dim_x = 9
-        # Measurement vector dimension (position in 3D)
-        self.dim_z = 3
+    def __init__(self, mode='position'):
+        """
+        Initialize Kalman filter for either position or angular tracking
+        
+        Args:
+            mode: 'position' for mocap tracking, 'angular' for visual tracking
+        """
+        if mode == 'position':
+            # State vector: [x, y, z, vx, vy, vz, ax, ay, az]
+            self.dim_x = 9
+            self.dim_z = 3
+            self.H = np.zeros((self.dim_z, self.dim_x))
+            self.H[:3, :3] = np.eye(3)  # Position measurements
+        else:  # angular mode
+            # State vector: [pan, tilt, pan_vel, tilt_vel, pan_acc, tilt_acc]
+            self.dim_x = 6
+            self.dim_z = 2
+            self.H = np.zeros((self.dim_z, self.dim_x))
+            self.H[:2, :2] = np.eye(2)  # Angular measurements
 
         # Initialize state estimate and covariance
         self.state_estimate = np.zeros((self.dim_x, 1))
         self.estimate_covariance = np.eye(self.dim_x) * 1e-3
 
         # Initialize matrices
-        self.F = np.eye(self.dim_x)  # State transition matrix
-        self.H = np.zeros((self.dim_z, self.dim_x))  # Observation matrix
-        self.H[:3, :3] = np.eye(3)
+        self.F = np.eye(self.dim_x)  # State transition matrix will be updated in create_F
 
         # Process and measurement noise
         self.Q0 = np.eye(self.dim_x) * 1e-4  # Increased from 1e-6 for faster response
@@ -32,22 +44,25 @@ class AdaptiveKalmanFilter:
         self.alpha_max = 20.0  # Increased from 10.0 to allow more aggressive adaptation
         self.expected_innovation_variance = 1e-4  # Decreased from 1e-3 for faster adaptation
 
+        self.mode = mode
+
     def create_F(self, delta_t: float) -> np.ndarray:
-        """
-        Create state transition matrix for given time step.
-        
-        Args:
-            delta_t: Time step in seconds
-            
-        Returns:
-            Updated state transition matrix
-        """
+        """Create state transition matrix based on mode"""
         dt = delta_t
         dt2 = 0.5 * dt ** 2
         F = np.eye(self.dim_x)
-        F[:3, 3:6] = np.eye(3) * dt
-        F[:3, 6:9] = np.eye(3) * dt2
-        F[3:6, 6:9] = np.eye(3) * dt
+        
+        if self.mode == 'position':
+            # Update position with velocity and acceleration
+            F[:3, 3:6] = np.eye(3) * dt
+            F[:3, 6:9] = np.eye(3) * dt2
+            F[3:6, 6:9] = np.eye(3) * dt
+        else:  # angular mode
+            # Update angles with angular velocity and acceleration
+            F[:2, 2:4] = np.eye(2) * dt
+            F[:2, 4:6] = np.eye(2) * dt2
+            F[2:4, 4:6] = np.eye(2) * dt
+            
         return F
 
     def update_F(self, delta_t: float) -> None:

@@ -20,7 +20,6 @@ class CameraManager:
         self.frame_queue = Queue()
         self.recording = False
         self.writer = None
-        self.is_paused = False
         self.debug_overlay = False
 
         # Initialize frame streaming params
@@ -219,7 +218,7 @@ class CameraManager:
             "-input_framerate": 30,
             "-r": "30",
             "-preset": "ultrafast",
-            "-crf": 22,
+            "-crf": 20,
             "-ffmpeg_download_path": "_local/ffmpeg"
         }
 

@@ -97,3 +97,8 @@ class UIController:
         """Update the mocap button text and icon"""
         if self.dart.state.ui.mocap_button:
             self.dart.state.ui.mocap_button.configure(text=text, image=icon)
+
+    def update_track_mode(self, mode: str) -> None:
+        """Update tracking mode selector"""
+        if self.dart.state.ui.track_mode:
+            self.dart.state.ui.track_mode.set(mode.capitalize())

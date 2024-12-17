@@ -22,6 +22,7 @@ from ui.ui_controller import UIController
 from core.device_manager import DeviceManager
 from core.config_manager import ConfigManager
 from ui.views.theia_control_window import TheiaLensControlWindow
+import threading, sys
 
 
 class DART:
@@ -72,15 +73,14 @@ class DART:
         try:
             device_config = self.config.config["devices"]
             
-            # Auto-connect cameras if configured
-            if device_config["cameras"]:
+            # Only connect recording camera in main process
+            if device_config["cameras"]["recording"]:
                 self.camera_manager = CameraManager()
-                for serial in device_config["cameras"]:
-                    if self.camera_manager.connect_camera(serial):
-                        self.ui_controller.update_camera_status("Connected")
-                    else:
-                        self.ui_controller.update_camera_status("Failed")
-                        self.logger.error(f"Failed to connect camera: {serial}")
+                if self.camera_manager.connect_camera(device_config["cameras"]["recording"]):
+                    self.ui_controller.update_camera_status("Connected")
+                else:
+                    self.ui_controller.update_camera_status("Failed")
+                    self.logger.error(f"Failed to connect recording camera")
             
             # Auto-connect Dynamixel if configured
             if device_config["dynamixel_port"]:
@@ -184,7 +184,6 @@ class DART:
             # Set the callback function to be executed when the writing thread finishes
             self.camera_manager.set_on_write_finished(self.on_write_finished)
 
-            self.state.ui.pause_button.configure(state="normal")
         else:
             self.logger.info("Stopping recording sequence...")
             
@@ -210,50 +209,11 @@ class DART:
                 self.data_handler.stop()
 
             # Update UI
-            if self.camera_manager.is_paused:
-                self.state.ui.pause_button.configure(
-                    text="Pause", 
-                    state="disabled", 
-                    image=self.state.get_icon('pause')
-                )
-                self.camera_manager.is_paused = False
-                self.state.ui.record_button.configure(
-                    text="Record", 
-                    state="enabled", 
-                    image=self.state.get_icon('record')
-                )
-            else:
-                self.state.ui.record_button.configure(text="Saving", state="disabled")
-
-    def toggle_pause(self):
-        if self.camera_manager.is_paused:
-            # Stop the stream frame thread if it's running
-            if self.camera_manager.is_reading:
-                self.camera_manager.stop_frame_thread()
-
-            # Resume recording with a new video file
-            self.camera_manager.is_paused = False
-            timestamp = time.strftime("%d%mT%H%M%S")
-            file_name = f"video_{timestamp}.mp4"
-            filename = os.path.join(self.state.recording.video_path, file_name)
-            self.camera_manager.start_recording(filename)
-
-            # Set the callback function to be executed when the writing thread finishes
-            self.camera_manager.set_on_write_finished(self.on_write_finished)
-            self.state.ui.pause_button.configure(text="Pause", image=self.state.get_icon('pause'))
-        else:
-            # Pause recording and stop the current video file
-            self.camera_manager.is_paused = True
-            self.camera_manager.stop_recording()
-            
-            self.state.ui.pause_button.configure(text="Saving", state="disabled")
+            self.state.ui.record_button.configure(text="Saving", state="disabled")
 
     def on_write_finished(self):
-        if not self.camera_manager.is_paused:
-            # Update the record button to allow recording again
-            self.state.ui.record_button.configure(text="Record", image=self.state.get_icon('record'), state="normal")
-        else:
-            self.state.ui.pause_button.configure(text="Resume", image=self.state.get_icon('play'), state="normal")
+        # Update the record button to allow recording again
+        self.state.ui.record_button.configure(text="Record", image=self.state.get_icon('record'), state="normal")
             
         # Restart the frame thread if video feed is live
         if self.state.recording.is_live:
@@ -297,17 +257,23 @@ class DART:
             self.display_frame(processed_frame)
             
         if self.state.recording.is_live:
-            self.window.after(10, self.update_video_label)
+            self.window.after(33, self.update_video_label)
 
     def update_num_marker_label(self):
         """Update the marker count display"""
         if self.state.hardware.qtm_stream is not None:
             try:
+                # Get marker count without locking for too long
                 num_markers = self.state.hardware.qtm_stream.num_markers
-                self.ui_controller.update_marker_count(num_markers)
-                # Schedule next update only if QTM stream exists
-                if self.state.hardware.qtm_stream:
-                    self.window.after(200, self.update_num_marker_label)
+                
+                # Use after_idle for better UI performance
+                self.window.after_idle(
+                    lambda: self.ui_controller.update_marker_count(num_markers)
+                )
+                
+                # Schedule next update with longer interval for better performance
+                self.window.after(500, self.update_num_marker_label)  # Update every 500ms instead of 200ms
+                
             except Exception as e:
                 self.logger.error(f"Error updating marker count: {e}")
                 self.ui_controller.update_mocap_status("Error")
@@ -320,7 +286,7 @@ class DART:
         img = Image.fromarray(img)
 
         # Convert to tk img
-        img = ctk.CTkImage(img, size=(self.camera_manager.frame_width, self.camera_manager.frame_height))
+        img = ctk.CTkImage(img, size=(2*self.camera_manager.frame_width/3, 2*self.camera_manager.frame_height/3))
 
         # Update label with new image through state manager
         if self.state.ui.video_label:
@@ -392,23 +358,52 @@ class DART:
                 self.ui_controller.update_mocap_button("Disconnect", self.state.get_icon('stop'))
         else:
             try:
-                self.state.hardware.qtm_stream._close()
                 self.state.hardware.qtm_stream.close()
                 self.state.hardware.qtm_stream = None
                 self.ui_controller.update_mocap_status("Disconnected")
                 self.ui_controller.update_mocap_button("Connect", self.state.get_icon('sync'))
             except Exception as e:
-                self.logger.error(f"Error disconnecting from QTM: {e}")
+                self.logger.error(f"Error disconnecting from mocap: {e}")
 
     def connect_mocap(self):
         try:
-            self.state.hardware.qtm_stream = QTMStream()
+            mocap_config = self.config.config["devices"]["mocap"]
+            system = mocap_config.get("system", "qualisys")
+            
+            if system == "qualisys":
+                from hardware.mocap.qtm_mocap import QTMStream
+                self.state.hardware.qtm_stream = QTMStream(qtm_ip=mocap_config["ip"])
+                self.state.hardware.qtm_stream.start()
+            elif system == "vicon":
+                from hardware.mocap.vicon_stream import ViconStream
+                # Create a thread for Vicon connection
+                def connect_vicon():
+                    try:
+                        vicon = ViconStream(
+                            vicon_host=mocap_config["ip"],
+                            udp_port=mocap_config["port"]
+                        )
+                        vicon.start()
+                        self.state.hardware.qtm_stream = vicon
+                        self.ui_controller.update_mocap_status("Connected")
+                        self.logger.info(f"Connected to {system.upper()} system.")
+                    except Exception as e:
+                        self.ui_controller.update_mocap_status("Failed")
+                        self.logger.error(f"Error connecting to Vicon: {e}")
+                        self.state.hardware.qtm_stream = None
+
+                # Start connection in separate thread
+                threading.Thread(target=connect_vicon, daemon=True).start()
+                return  # Return early as connection will happen asynchronously
+            else:
+                raise ValueError(f"Unknown mocap system: {system}")
+            
             self.state.hardware.qtm_stream.calibration_target = True
             self.ui_controller.update_mocap_status("Connected")
-            self.logger.info("Connected to QTM.")
+            self.logger.info(f"Connected to {system.upper()} system.")
         except Exception as e:
             self.ui_controller.update_mocap_status("Failed")
-            self.logger.error(f"Error connecting to QTM: {e}")
+            self.logger.error(f"Error connecting to mocap: {e}")
             self.state.hardware.qtm_stream = None
 
     def set_torque(self):
@@ -454,6 +449,7 @@ class DART:
             # Stop any ongoing tracking
             if self.state.tracking['process'] is not None:
                 self.state.stop_tracking()
+                time.sleep(0.1)  # Give time for process cleanup
 
             # Stop video feed
             if self.state.recording.is_live:
@@ -463,9 +459,10 @@ class DART:
             if hasattr(self, 'camera_manager'):
                 self.camera_manager.release()
                 
-            # Close QTM connection
+            # Close mocap connection
             if self.state.hardware.qtm_stream:
-                self.state.hardware.qtm_stream._close()
+                if isinstance(self.state.hardware.qtm_stream, QTMStream):
+                    self.state.hardware.qtm_stream._close()
                 self.state.hardware.qtm_stream.close()
                 
             # Close motor controllers
@@ -483,9 +480,11 @@ class DART:
             self.logger.error(f"Error during cleanup: {e}")
             
         finally:
-            # Force exit
-            import sys
-            sys.exit(0)
+            # Force exit only if normal cleanup fails
+            try:
+                sys.exit(0)
+            except SystemExit:
+                os._exit(0)
 
     def select_folder(self):
         path = ctk.filedialog.askdirectory()
@@ -625,6 +624,41 @@ class DART:
             # Create new window
             self.theia_window = TheiaLensControlWindow(self.window, self)
             self.theia_window.grab_set()
+
+    def stop_tracking(self):
+        """Stop tracking process and cleanup resources"""
+        if self.tracking['process'] is not None:
+            try:
+                # Signal the process to stop
+                self.tracking['terminate_event'].set()
+                
+                # Give the process time to cleanup
+                self.tracking['process'].join(timeout=2.0)
+                
+                # If process hasn't terminated, force terminate
+                if self.tracking['process'].is_alive():
+                    self.tracking['process'].terminate()
+                    self.tracking['process'].join()
+                
+                # Clear the queue
+                while not self.tracking['data_queue'].empty():
+                    try:
+                        self.tracking['data_queue'].get_nowait()
+                    except:
+                        pass
+                    
+                # Close the queue
+                self.tracking['data_queue'].close()
+                self.tracking['data_queue'].join_thread()
+                
+            except Exception as e:
+                self.logger.error(f"Error stopping tracking process: {e}")
+                
+            finally:
+                # Reset tracking state
+                self.tracking['process'] = None
+                self.tracking['data_queue'] = None
+                self.tracking['terminate_event'] = None
 
 def get_serial_ports() -> list:
     """Lists available serial ports.

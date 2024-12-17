@@ -336,6 +336,12 @@ if __name__ == "__main__":
         # Connect to the controller
         controller.connect()
         controller.initialise()
+
+        time.sleep(1)
+        
+        # Set filter to VIS only mode
+        controller._ser_send("M8")  # VIS filter only (instead of M8 for IR+VIS)
+        controller.logger.info("Set filter to VIS only mode")
         
         # Measure command latency
         print("\nMeasuring serial command latency...")

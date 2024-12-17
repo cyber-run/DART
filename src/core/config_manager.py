@@ -16,7 +16,10 @@ class ConfigManager:
         """Return default configuration"""
         return {
             "devices": {
-                "cameras": [],
+                "cameras": {
+                    "tracking": "24211773",  # Visual tracking camera
+                    "recording": "23473307"  # Recording camera
+                },
                 "dynamixel_port": "",
                 "theia_port": "",
                 "last_detected": None,
@@ -34,7 +37,16 @@ class ConfigManager:
                 "is_calibrated": False
             },
             "tracking": {
-                "use_kalman": True  # Default to using Kalman filter
+                "use_kalman": True,
+                "mode": "mocap",  # Can be 'mocap' or 'visual'
+                "visual_tracking": {
+                    "frame_history": 60,
+                    "deviation_threshold": 4.0,
+                    "min_contour_area": 100,
+                    "max_object_distance": 75,
+                    "learning_rate": 0.005,
+                    "min_object_lifespan": 3
+                }
             }
         }
     

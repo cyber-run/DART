@@ -183,6 +183,20 @@ class TrackView(BaseView):
         self.track_frame.configure(fg_color=FRAME_COLOR)
         self.track_frame.grid(row=2, column=2, sticky="nsew", padx=5, pady=5)
 
+        # Add tracking mode selector
+        mode_frame = ctk.CTkFrame(self.track_frame, fg_color=TRANSPARENT)
+        mode_frame.pack(side="top", padx=10, pady=5)
+        
+        self.dart.state.ui.track_mode = ctk.CTkSegmentedButton(
+            mode_frame,
+            values=["MoCap", "Visual"],
+            command=self.on_track_mode_change
+        )
+        self.dart.state.ui.track_mode.set(
+            "Visual" if self.dart.config.config["tracking"]["mode"] == "visual" else "MoCap"
+        )
+        self.dart.state.ui.track_mode.pack(pady=5)
+
         # Track button
         self.dart.state.ui.track_button = ctk.CTkButton(
             self.track_frame,
@@ -286,18 +300,6 @@ class TrackView(BaseView):
         )
         self.dart.state.ui.record_button.pack(side="left", padx=10, anchor="center", expand=True)
 
-        # Pause button
-        self.dart.state.ui.pause_button = ctk.CTkButton(
-            self.camera_frame,
-            width=100,
-            text="Pause",
-            image=self.dart.state.get_icon('pause'),
-            command=self.dart.toggle_pause,
-            state="disabled",
-            font=GLOBAL_FONT
-        )
-        self.dart.state.ui.pause_button.pack(side="left", padx=10, anchor="center", expand=True)
-
         # FPS display with safe default
         fps_frame = ctk.CTkFrame(self.camera_frame, fg_color=TRANSPARENT)
         fps_frame.pack(side="right", padx=10, pady=10, anchor="e", expand=True)
@@ -312,3 +314,9 @@ class TrackView(BaseView):
             font=GLOBAL_FONT
         )
         self.dart.state.ui.fps_label.pack(padx=5, pady=5)
+
+    def on_track_mode_change(self, value):
+        """Handle tracking mode change"""
+        mode = value.lower()
+        self.dart.config.config["tracking"]["mode"] = mode
+        self.dart.config.save_config()

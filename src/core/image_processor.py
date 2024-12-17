@@ -20,6 +20,9 @@ class ImageProcessor:
         :return: The processed frame.
         """
 
+        if frame is None:
+            return None
+
         # Convert to grayscale if needed
         if self.needs_grayscale():
             if len(frame.shape) == 3 and frame.shape[2] == 3:  # Check if the image has 3 channels
@@ -73,7 +76,13 @@ class ImageProcessor:
         :param frame: The frame on which the crosshair will be drawn.
         :return: The frame with a crosshair.
         """
-        height, width = frame.shape[:2]
-        cv2.line(frame, (width // 2, 0), (width // 2, height), (0, 255, 0), 2)
-        cv2.line(frame, (0, height // 2), (width, height // 2), (0, 255, 0), 2)
-        return frame
+        # Make a copy of the frame to make it writable
+        frame_copy = frame.copy()
+        
+        height, width = frame_copy.shape[:2]
+        # Draw vertical line
+        cv2.line(frame_copy, (width // 2, 0), (width // 2, height), (0, 255, 0), 2)
+        # Draw horizontal line
+        cv2.line(frame_copy, (0, height // 2), (width, height // 2), (0, 255, 0), 2)
+        
+        return frame_copy
